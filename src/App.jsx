@@ -21,17 +21,23 @@ function App() {
     const [activeLayerId, setActiveLayerId] = useState('layer-0');
     const layerCounterRef = useRef(1);
 
+    // Clear selection when active layer changes
+    useEffect(() => {
+        setSelectedAtomIds([]);
+    }, [activeLayerId]);
+
     // Actions
     // Undo history: stack of { atoms, lattice }
     const historyRef = useRef([]);
     const isUndoingRef = useRef(false);
     const MAX_HISTORY = 100;
 
-    const saveStateToHistory = useCallback((prevAtoms, prevLattice) => {
+    const saveStateToHistory = useCallback((prevAtoms, prevLattice, prevLayers) => {
         if (isUndoingRef.current) return;
         const snap = {
             atoms: prevAtoms ? prevAtoms.map(a => ({ ...a })) : [],
-            lattice: prevLattice ? prevLattice.map(row => row.slice()) : null
+            lattice: prevLattice ? prevLattice.map(row => row.slice()) : null,
+            layers: prevLayers ? JSON.parse(JSON.stringify(prevLayers)) : []
         };
         historyRef.current.push(snap);
         if (historyRef.current.length > MAX_HISTORY) historyRef.current.shift();
@@ -49,6 +55,7 @@ function App() {
         isUndoingRef.current = true;
         setAtoms(last.atoms || []);
         setLattice(last.lattice);
+        if (last.layers) setLayers(last.layers);
         setSelectedAtomIds([]);
         // allow state push suppression to end on next tick
         setTimeout(() => { isUndoingRef.current = false; }, 0);
@@ -92,7 +99,7 @@ function App() {
                         const maxId = atoms && atoms.length ? Math.max(...atoms.map(a => a.id)) : -1;
                         const mapped = (newAtoms || []).map((a, i) => ({ ...a, id: maxId + 1 + i, layerId: activeLayerId }));
                         setAtoms(prev => {
-                            saveStateToHistory(prev, lattice);
+                            saveStateToHistory(prev, lattice, layers);
                             const others = prev.filter(a => a.layerId !== activeLayerId);
                             return [...others, ...mapped];
                         });
@@ -170,7 +177,7 @@ function App() {
                     // Update global lattice if none exists or if importing into the base (first) layer
                     if (!lattice || activeLayerId === (layers && layers[0] && layers[0].id)) setLattice(lat);
                     setAtoms(prev => {
-                        saveStateToHistory(prev, lattice);
+                        saveStateToHistory(prev, lattice, layers);
                         const others = prev.filter(a => a.layerId !== activeLayerId);
                         return [...others, ...mapped];
                     });
@@ -205,19 +212,29 @@ function App() {
     };
 
     const handleSupercell = (mode, diag, matrix) => {
+        // Use active layer lattice
+        const activeLayer = layers.find(l => l.id === activeLayerId);
+        const currentLattice = activeLayer?.lattice || lattice;
+
         let M = mode==='diag' ? [[diag[0],0,0],[0,diag[1],0],[0,0,diag[2]]] : matrix;
         if(Math.abs(MathUtils.det3x3(M))<1e-3) return alert('Invalid Matrix');
         
-        const newLattice = MathUtils.matMul3x3(M, lattice);
+        const newLattice = MathUtils.matMul3x3(M, currentLattice);
         const invM = MathUtils.inv3x3(M);
-        const newAtoms = [];
-        let gId=0;
+        
+        // Filter atoms
+        const activeAtoms = atoms.filter(a => a.layerId === activeLayerId);
+        const otherAtoms = atoms.filter(a => a.layerId !== activeLayerId);
+
+        const newActiveAtoms = [];
+        let maxId = atoms.length > 0 ? Math.max(...atoms.map(a => a.id)) : -1;
+
         const range = Math.ceil(Math.max(...M.flat().map(Math.abs)))+1;
         // Assume current atoms store Cartesian, we need fractional in OLD lattice first
-        const invOldL = MathUtils.inv3x3(lattice);
+        const invOldL = MathUtils.inv3x3(currentLattice);
 
-        // Pre-calc fractional for old atoms
-        const oldFracs = atoms.map(a => ({...a, f: MathUtils.multiplyMatrixVector(invOldL, [a.x,a.y,a.z])}));
+        // Pre-calc fractional for active atoms
+        const oldFracs = activeAtoms.map(a => ({...a, f: MathUtils.multiplyMatrixVector(invOldL, [a.x,a.y,a.z])}));
 
         for(let i=-range; i<=range; i++){
             for(let j=-range; j<=range; j++){
@@ -234,30 +251,31 @@ function App() {
                         
                         if(fx>=-0.001 && fx<0.999 && fy>=-0.001 && fy<0.999 && fz>=-0.001 && fz<0.999) {
                             const [cx, cy, cz] = MathUtils.multiplyMatrixVector(newLattice, [fx,fy,fz]);
-                            newAtoms.push({id: gId++, element: atom.element, x:cx, y:cy, z:cz});
+                            newActiveAtoms.push({id: ++maxId, element: atom.element, x:cx, y:cy, z:cz, layerId: activeLayerId});
                         }
                     });
                 }
             }
         }
-        saveStateToHistory(atoms, lattice);
-        setLattice(newLattice);
-        setAtoms(ensureLayered(newAtoms, activeLayerId));
+        saveStateToHistory(atoms, lattice, layers);
+        setLayers(prev => prev.map(l => l.id === activeLayerId ? { ...l, lattice: newLattice } : l));
+        setAtoms([...otherAtoms, ...newActiveAtoms]);
     };
 
     const handleVacuum = (size) => {
         const oldLen = Math.sqrt(lattice[2][0]**2+lattice[2][1]**2+lattice[2][2]**2);
         const ratio = (oldLen+size)/oldLen;
         const newL = [lattice[0], lattice[1], lattice[2].map(v=>v*ratio)];
-        saveStateToHistory(atoms, lattice);
+        saveStateToHistory(atoms, lattice, layers);
         setLattice(newL);
+        setLayers(prev => prev.map(l => l.id === activeLayerId ? { ...l, lattice: newL } : l));
         // Cartesian coords stay same, relative changes (handled by rendering logic)
     };
 
     const onAtomClick = useCallback((id, isMulti) => {
         if(editMode === 'DELETE' && id !== null) {
             setAtoms(prev => {
-                saveStateToHistory(prev, lattice);
+                saveStateToHistory(prev, lattice, layers);
                 return prev.filter(a => a.id !== id);
             });
             setSelectedAtomIds(prev => prev.filter(i => i !== id));
@@ -272,7 +290,7 @@ function App() {
                 }
             }
         }
-    }, [editMode, lattice, saveStateToHistory]);
+    }, [editMode, lattice, layers, saveStateToHistory]);
 
     const onBoxSelect = useCallback((ids, isMulti) => {
         if (isMulti) {
@@ -285,7 +303,7 @@ function App() {
 
     const onAtomsMoveEnd = useCallback((moves) => {
         setAtoms(prev => {
-            saveStateToHistory(prev, lattice);
+            saveStateToHistory(prev, lattice, layers);
             const moveMap = new Map(moves.map(m => [m.id, m]));
             return prev.map(a => {
                 if (moveMap.has(a.id)) {
@@ -295,7 +313,7 @@ function App() {
                 return a;
             });
         });
-    }, [lattice, saveStateToHistory]);
+    }, [lattice, layers, saveStateToHistory]);
 
     // Initial Load
     useEffect(() => {

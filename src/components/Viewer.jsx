@@ -18,6 +18,11 @@ const Viewer = ({ atoms, lattice, layers = [], activeLayerId, selectedAtomIds, o
         initialAtomPositions: new Map() // Map<atomId, {x,y,z}>
     });
 
+    const latestProps = useRef({ atoms, activeLayerId });
+    useEffect(() => {
+        latestProps.current = { atoms, activeLayerId };
+    }, [atoms, activeLayerId]);
+
     const visibleAtoms = useMemo(() => {
         try {
             const vis = new Set((layers || []).filter(l => l && l.visible).map(l => l.id));
@@ -250,8 +255,14 @@ const Viewer = ({ atoms, lattice, layers = [], activeLayerId, selectedAtomIds, o
             const meshes = Array.from(threeRef.current.atomMeshes.values());
             const intersects = raycaster.intersectObjects(meshes);
             
-            if (intersects.length > 0) {
-                onAtomClick(intersects[0].object.userData.id, e.ctrlKey || e.metaKey);
+            // Filter intersects to only include atoms in active layer
+            const { atoms: currentAtoms, activeLayerId: currentLayerId } = latestProps.current;
+            const activeLayerAtomIds = new Set(currentAtoms.filter(a => a.layerId === currentLayerId).map(a => a.id));
+            
+            const validIntersects = intersects.filter(hit => activeLayerAtomIds.has(hit.object.userData.id));
+
+            if (validIntersects.length > 0) {
+                onAtomClick(validIntersects[0].object.userData.id, e.ctrlKey || e.metaKey);
             } else {
                 onAtomClick(null, e.ctrlKey || e.metaKey); // Deselect or clear
             }
@@ -326,6 +337,8 @@ const Viewer = ({ atoms, lattice, layers = [], activeLayerId, selectedAtomIds, o
 
             const { camera, atomMeshes } = threeRef.current;
             const selectedIds = [];
+            const { atoms: currentAtoms, activeLayerId: currentLayerId } = latestProps.current;
+            const activeLayerAtomIds = new Set(currentAtoms.filter(a => a.layerId === currentLayerId).map(a => a.id));
             
             atomMeshes.forEach((mesh, id) => {
                 const vector = new THREE.Vector3();
@@ -335,7 +348,9 @@ const Viewer = ({ atoms, lattice, layers = [], activeLayerId, selectedAtomIds, o
                 const y = (-(vector.y * .5) + .5) * rect.height;
                 
                 if (x >= left && x <= right && y >= top && y <= bottom) {
-                    selectedIds.push(id);
+                    if (activeLayerAtomIds.has(id)) {
+                        selectedIds.push(id);
+                    }
                 }
             });
             
