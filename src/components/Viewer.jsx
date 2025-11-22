@@ -51,7 +51,7 @@ const Viewer = ({ atoms, lattice, layers = [], activeLayerId, selectedAtomIds, o
         const camera = new THREE.PerspectiveCamera(45, width/height, 0.1, 1000);
         // Make camera use Z as up as well
         camera.up.set(0, 0, 1);
-        camera.position.set(10, 10, 10);
+        camera.position.set(25, 30, 20);
 
         const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
         renderer.setSize(width, height);
@@ -60,6 +60,7 @@ const Viewer = ({ atoms, lattice, layers = [], activeLayerId, selectedAtomIds, o
 
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
+        controls.target.set(5, 5, 5);
 
         // Transform Controls for Dragging
         const transformControl = new TransformControls(camera, renderer.domElement);

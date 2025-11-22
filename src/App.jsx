@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Viewer from './components/Viewer';
+import MolstarViewer from './components/MolstarViewer';
 import LeftPanel from './components/LeftPanel';
 import RightPanel from './components/RightPanel';
 import { MathUtils } from './utils/math';
-import { parseXYZ } from './utils/parsers';
+import { parse, detectFormat } from './utils/parsers';
 import { DEMO_POSCAR } from './constants/elements';
 
 function App() {
@@ -16,6 +17,9 @@ function App() {
     const [editMode, setEditMode] = useState('SELECT');
     const [targetElement, setTargetElement] = useState('O');
     const [fileError, setFileError] = useState(null);
+    const [pdbContent, setPdbContent] = useState(null);
+    const [viewMode, setViewMode] = useState('default'); // 'default' | 'protein'
+
     // Layers State (minimal)
     const [layers, setLayers] = useState([{ id: 'layer-0', name: 'Layer 1', visible: true, opacity: 1, lattice: lattice }]);
     const [activeLayerId, setActiveLayerId] = useState('layer-0');
@@ -73,119 +77,144 @@ function App() {
         return () => window.removeEventListener('keydown', handler);
     }, [undo]);
 
-    const handleLoad = (e) => {
-        const file = e.target.files[0];
-        if(!file) return;
+    const parseFile = async (file) => {
         const reader = new FileReader();
-        setFileError(null);
-        reader.onerror = () => { setFileError('Unable to read file.'); };
-        reader.onload = (ev) => {
-            // Support XYZ and POSCAR-like (simple) formats
-            try {
-                const name = file.name || '';
-                const text = ev.target.result;
-                if (typeof text !== 'string' || text.trim().length === 0) {
-                    setFileError('Empty or unreadable file. Please select a valid .xyz or POSCAR-like file.');
-                    return;
-                }
-                if (name.toLowerCase().endsWith('.xyz')) {
-                    const { atoms: newAtoms, lattice: newLat } = parseXYZ(text);
-                    if (!newAtoms || newAtoms.length === 0) {
-                        setFileError('Could not parse .xyz file. Ensure it contains a valid atom count and coordinates.');
+        return new Promise((resolve, reject) => {
+            reader.onerror = () => reject(new Error('Unable to read file.'));
+            reader.onload = async (ev) => {
+                try {
+                    const name = file.name || '';
+                    const text = ev.target.result;
+                    if (typeof text !== 'string' || text.trim().length === 0) {
+                        reject(new Error(`Empty or unreadable file. Supported formats: .xyz (atom count + coordinates), .pdb (ATOM records), .cif (Crystallographic Information File), POSCAR-like text`));
                         return;
                     }
-                    // Replace contents of the active layer: remove old atoms in that layer, then add imported atoms
-                    {
-                        const maxId = atoms && atoms.length ? Math.max(...atoms.map(a => a.id)) : -1;
-                        const mapped = (newAtoms || []).map((a, i) => ({ ...a, id: maxId + 1 + i, layerId: activeLayerId }));
-                        setAtoms(prev => {
-                            saveStateToHistory(prev, lattice, layers);
-                            const others = prev.filter(a => a.layerId !== activeLayerId);
-                            return [...others, ...mapped];
+                    const lowerName = name.toLowerCase();
+                    let format = null;
+                    if (lowerName.endsWith('.xyz')) format = 'xyz';
+                    else if (lowerName.endsWith('.pdb')) format = 'pdb';
+                    else if (lowerName.endsWith('.cif')) format = 'cif';
+                    else format = 'poscar'; // default
+
+                    if (format === 'poscar') {
+                        // Inline POSCAR parsing
+                        const lines = text.trim().split('\n').map(l=>l.trim()).filter(l=>l!=='');
+                        if (lines.length < 6) {
+                            reject(new Error(`Unrecognized file format. Supported formats: .xyz, .pdb, .cif, POSCAR-like text`));
+                            return;
+                        }
+                        const scale = parseFloat(lines[1]);
+                        if (!Number.isFinite(scale) || isNaN(scale)) {
+                            reject(new Error('POSCAR-like parse failed: missing numeric scale on line 2.'));
+                            return;
+                        }
+                        const lat = [];
+                        let latOk = true;
+                        for(let i=2;i<=4;i++){
+                            const row = lines[i].split(/\s+/).map(x=>parseFloat(x)*scale);
+                            if (row.length < 3 || row.some(v => !Number.isFinite(v))) { latOk = false; break; }
+                            lat.push(row);
+                        }
+                        if (!latOk) { reject(new Error('POSCAR-like parse failed: invalid lattice vectors.')); return; }
+
+                        let elems = [];
+                        try { elems = lines[5].split(/\s+/).filter(x=>x!=='' && isNaN(parseFloat(x))); } catch(e) { elems = []; }
+                        let idx = elems.length ? 6 : 5;
+                        const countsLine = lines[idx] || '';
+                        const counts = countsLine.split(/\s+/).map(n => parseInt(n,10)).filter(n => Number.isFinite(n));
+                        if (!counts || counts.length === 0) {
+                            reject(new Error('POSCAR-like parse failed: element counts line missing or invalid.'));
+                            return;
+                        }
+                        let typeLine = lines[idx+1] || '';
+                        let start = idx+2;
+                        if(typeLine.toLowerCase().startsWith('s')) { start++; typeLine=lines[idx+2] || ''; }
+                        const isDirect = /direct|fractional/i.test(typeLine);
+
+                        let newAtoms = [];
+                        let gId = 0;
+                        let cursor = start;
+                        let totalExpected = counts.reduce((a,b)=>a+b,0);
+                        if (lines.length < cursor + totalExpected) {
+                            reject(new Error('POSCAR-like parse failed: not enough coordinate lines for declared atom counts.'));
+                            return;
+                        }
+                        elems = elems.length ? elems : new Array(counts.length).fill('X');
+                        elems.forEach((el, i) => {
+                            for(let c=0; c<counts[i]; c++){
+                                const line = lines[cursor++] || '';
+                                const cds = line.split(/\s+/).slice(0,3).map(Number);
+                                if (cds.length < 3 || cds.some(v => !Number.isFinite(v))) { reject(new Error('POSCAR-like parse failed: invalid coordinates.')); return; }
+                                let x,y,z;
+                                if(isDirect) [x,y,z] = MathUtils.multiplyMatrixVector(lat, cds);
+                                else [x,y,z] = cds;
+                                newAtoms.push({id: gId++, element: el, x, y, z});
+                            }
                         });
-                        // Save lattice on this layer
-                        setLayers(prev => prev.map(l => l.id === activeLayerId ? { ...l, lattice: newLat || null } : l));
-                        // Update global lattice if none exists or if importing into the base (first) layer
-                        if (!lattice || activeLayerId === (layers && layers[0] && layers[0].id)) setLattice(newLat || null);
-                        setSelectedAtomIds(mapped.map(m => m.id));
+                        if (!newAtoms || newAtoms.length === 0) { reject(new Error('No atoms found in file.')); return; }
+                        resolve({ newAtoms, newLat: lat, isPdb: false, text: null });
+                    } else {
+                        const { atoms: newAtoms, lattice: newLat } = await parse(text, format);
+                        if (!newAtoms || newAtoms.length === 0) {
+                            reject(new Error(`Could not parse ${format} file. Ensure it contains valid atom records.`));
+                            return;
+                        }
+                        resolve({ newAtoms, newLat, isPdb: lowerName.endsWith('.pdb'), text: lowerName.endsWith('.pdb') ? text : null });
                     }
-                    return;
+                } catch (e) {
+                    reject(e);
                 }
+            };
+            reader.readAsText(file);
+        });
+    };
 
-                // Fallback: attempt to parse POSCAR-like format (existing code)
-                const lines = text.trim().split('\n').map(l=>l.trim()).filter(l=>l!=='');
-                // Basic validation for POSCAR-like minimal structure
-                if (lines.length < 6) {
-                    setFileError('Unrecognized file format. Supported: .xyz (atom count + coordinates) or POSCAR-like text.');
-                    return;
-                }
-                const scale = parseFloat(lines[1]);
-                if (!Number.isFinite(scale) || isNaN(scale)) {
-                    setFileError('POSCAR-like parse failed: missing numeric scale on line 2.');
-                    return;
-                }
-                const lat = [];
-                let latOk = true;
-                for(let i=2;i<=4;i++){
-                    const row = lines[i].split(/\s+/).map(x=>parseFloat(x)*scale);
-                    if (row.length < 3 || row.some(v => !Number.isFinite(v))) { latOk = false; break; }
-                    lat.push(row);
-                }
-                if (!latOk) { setFileError('POSCAR-like parse failed: invalid lattice vectors.'); return; }
+    const importFile = async (file, createNewLayer) => {
+        const { newAtoms, newLat, isPdb, text } = await parseFile(file);
+        if (isPdb) setPdbContent(text);
+        if (createNewLayer) {
+            const id = `layer-${Date.now()}`;
+            const nameLayer = `Layer ${layers.length + 1}`;
+            const newLayer = { id, name: nameLayer, visible: true, opacity: 1, lattice: newLat || null };
+            setLayers(prev => [newLayer, ...prev]);
+            setActiveLayerId(id);
+        }
+        const maxId = atoms && atoms.length ? Math.max(...atoms.map(a => a.id)) : -1;
+        const mapped = (newAtoms || []).map((a, i) => ({ ...a, id: maxId + 1 + i, layerId: activeLayerId }));
+        setAtoms(prev => {
+            saveStateToHistory(prev, lattice, layers);
+            if (createNewLayer) {
+                return [...prev, ...mapped];
+            } else {
+                const others = prev.filter(a => a.layerId !== activeLayerId);
+                return [...others, ...mapped];
+            }
+        });
+        setLayers(prev => prev.map(l => l.id === activeLayerId ? { ...l, lattice: newLat || null } : l));
+        if (!lattice || activeLayerId === (layers && layers[0] && layers[0].id)) setLattice(newLat || null);
+        setSelectedAtomIds(mapped.map(m => m.id));
+    };
 
-                let elems = [];
-                try { elems = lines[5].split(/\s+/).filter(x=>x!=='' && isNaN(parseFloat(x))); } catch(e) { elems = []; }
-                let idx = elems.length ? 6 : 5;
-                const countsLine = lines[idx] || '';
-                const counts = countsLine.split(/\s+/).map(n => parseInt(n,10)).filter(n => Number.isFinite(n));
-                if (!counts || counts.length === 0) {
-                    setFileError('POSCAR-like parse failed: element counts line missing or invalid.');
-                    return;
-                }
-                let typeLine = lines[idx+1] || '';
-                let start = idx+2;
-                if(typeLine.toLowerCase().startsWith('s')) { start++; typeLine=lines[idx+2] || ''; }
-                const isDirect = /direct|fractional/i.test(typeLine);
-
-                let newAtoms = [];
-                let gId = 0;
-                let cursor = start;
-                let totalExpected = counts.reduce((a,b)=>a+b,0);
-                if (lines.length < cursor + totalExpected) {
-                    setFileError('POSCAR-like parse failed: not enough coordinate lines for declared atom counts.');
-                    return;
-                }
-                elems = elems.length ? elems : new Array(counts.length).fill('X');
-                elems.forEach((el, i) => {
-                    for(let c=0; c<counts[i]; c++){
-                        const line = lines[cursor++] || '';
-                        const cds = line.split(/\s+/).slice(0,3).map(Number);
-                        if (cds.length < 3 || cds.some(v => !Number.isFinite(v))) { setFileError('POSCAR-like parse failed: invalid coordinates.'); return; }
-                        let x,y,z;
-                        if(isDirect) [x,y,z] = MathUtils.multiplyMatrixVector(lat, cds);
-                        else [x,y,z] = cds;
-                        newAtoms.push({id: gId++, element: el, x, y, z});
-                    }
-                });
-                if (!newAtoms || newAtoms.length === 0) { setFileError('No atoms found in file.'); return; }
-                // Replace contents of the active layer: remove old atoms in that layer, then add imported atoms
-                {
-                    const maxId = atoms && atoms.length ? Math.max(...atoms.map(a => a.id)) : -1;
-                    const mapped = (newAtoms || []).map((a, i) => ({ ...a, id: maxId + 1 + i, layerId: activeLayerId }));
-                    // Save lattice on this layer
-                    setLayers(prev => prev.map(l => l.id === activeLayerId ? { ...l, lattice: lat || null } : l));
-                    // Update global lattice if none exists or if importing into the base (first) layer
-                    if (!lattice || activeLayerId === (layers && layers[0] && layers[0].id)) setLattice(lat);
-                    setAtoms(prev => {
-                        saveStateToHistory(prev, lattice, layers);
-                        const others = prev.filter(a => a.layerId !== activeLayerId);
-                        return [...others, ...mapped];
-                    });
-                    setSelectedAtomIds(mapped.map(m => m.id));
-                }
-            } catch(err) { alert('解析错误'); }
-        };
-        reader.readAsText(file);
+    const handleLoad = async (e) => {
+        const file = e.target.files[0];
+        if(!file) return;
+        setFileError(null);
+        try {
+            const { newAtoms, newLat, isPdb, text } = await parseFile(file);
+            if (isPdb) setPdbContent(text);
+            const maxId = atoms && atoms.length ? Math.max(...atoms.map(a => a.id)) : -1;
+            const mapped = (newAtoms || []).map((a, i) => ({ ...a, id: maxId + 1 + i, layerId: activeLayerId }));
+            setAtoms(prev => {
+                saveStateToHistory(prev, lattice, layers);
+                const others = prev.filter(a => a.layerId !== activeLayerId);
+                return [...others, ...mapped];
+            });
+            setLayers(prev => prev.map(l => l.id === activeLayerId ? { ...l, lattice: newLat || null } : l));
+            if (!lattice || activeLayerId === (layers && layers[0] && layers[0].id)) setLattice(newLat || null);
+            setSelectedAtomIds(mapped.map(m => m.id));
+        } catch (e) {
+            setFileError(e.message);
+        }
     };
 
     const handleDownload = () => {
@@ -321,8 +350,27 @@ function App() {
         setAtoms([]);
     }, []);
 
+    const handleDragOver = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+    };
+
+    const handleDrop = async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const files = Array.from(e.dataTransfer.files);
+        for (const file of files) {
+            const createNew = !(layers.length === 1 && layers[0].id === 'layer-0' && atoms.filter(a => a.layerId === 'layer-0').length === 0);
+            try {
+                await importFile(file, createNew);
+            } catch (err) {
+                setFileError(err.message);
+            }
+        }
+    };
+
     return (
-        <div className="relative w-full h-full font-sans select-none">
+        <div className="relative w-full h-full font-sans select-none" onDragOver={handleDragOver} onDrop={handleDrop}>
             {fileError && (
                 <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 bg-red-600 text-white px-4 py-2 rounded shadow">
                     <div style={{display:'flex', alignItems:'center', gap:8}}>
@@ -332,15 +380,41 @@ function App() {
                     </div>
                 </div>
             )}
-            <Viewer 
-                atoms={atoms}
-                lattice={lattice}
-                layers={layers}
-                activeLayerId={activeLayerId}
-                selectedAtomIds={selectedAtomIds}
-                onAtomClick={onAtomClick}
-                onAtomsMoveEnd={onAtomsMoveEnd}
-                onBoxSelect={onBoxSelect}
+            {pdbContent && (
+                <div className="absolute top-4 right-80 z-50 flex gap-2">
+                    <button 
+                        className={`px-3 py-1 rounded shadow text-sm font-medium ${viewMode === 'default' ? 'bg-blue-600 text-white' : 'bg-white text-slate-700'}`}
+                        onClick={() => setViewMode('default')}
+                    >
+                        Atom View
+                    </button>
+                    <button 
+                        className={`px-3 py-1 rounded shadow text-sm font-medium ${viewMode === 'protein' ? 'bg-blue-600 text-white' : 'bg-white text-slate-700'}`}
+                        onClick={() => setViewMode('protein')}
+                    >
+                        Protein View
+                    </button>
+                </div>
+            )}
+
+            {viewMode === 'protein' && pdbContent ? (
+                <MolstarViewer pdbContent={pdbContent} />
+            ) : (
+                <Viewer 
+                    atoms={atoms}
+                    lattice={lattice}
+                    layers={layers}
+                    activeLayerId={activeLayerId}
+                    selectedAtomIds={selectedAtomIds}
+                    onAtomClick={onAtomClick}
+                    onAtomsMoveEnd={onAtomsMoveEnd}
+                    onBoxSelect={onBoxSelect}
+                />
+            )}
+<MolstarViewer 
+                pdbContent={pdbContent}
+                visible={viewMode === 'protein'}
+                onClose={() => setViewMode('default')}
             />
 
             <LeftPanel 
