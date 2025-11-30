@@ -16,5 +16,11 @@
   "Layers": "Capas",
   "Use Lattice": "Usar Red",
   "Delete Layer": "Eliminar Capa",
-  "New Layer": "Nueva Capa"
+  "New Layer": "Nueva Capa",
+  "Vacuum": "Vacío",
+  "Set Lengths": "Establecer Longitudes",
+  "Lattice Operations": "Operaciones de Red",
+  "Scale Lattice (keep atoms fixed)": "Escalar Red (mantener átomos fijos)",
+  "Set Lattice Lengths (Å) — keep atoms fixed": "Establecer Longitudes de Red (Å) — mantener átomos fijos",
+  "Scale": "Escala"
 }

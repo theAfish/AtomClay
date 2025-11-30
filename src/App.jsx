@@ -8,6 +8,7 @@ import ErrorBanner from './components/UI/ErrorBanner';
 import ViewModeToggle from './components/UI/ViewModeToggle';
 import FloatingControls from './components/UI/FloatingControls';
 import FooterHelp from './components/UI/FooterHelp';
+import ErrorBoundary from './components/ErrorBoundary';
 
 function AppContent() {
     const {
@@ -24,11 +25,13 @@ function AppContent() {
             <ViewModeToggle />
             <FloatingControls />
 
-            {viewMode === 'protein' && pdbContent ? (
-                <MolstarViewer pdbContent={pdbContent} theme={theme} />
-            ) : (
-                <Viewer />
-            )}
+            <ErrorBoundary>
+                {viewMode === 'protein' && pdbContent ? (
+                    <MolstarViewer pdbContent={pdbContent} theme={theme} />
+                ) : (
+                    <Viewer />
+                )}
+            </ErrorBoundary>
 
             <LeftPanel />
             <RightPanel />

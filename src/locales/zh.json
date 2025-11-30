@@ -16,5 +16,11 @@
   "Layers": "图层",
   "Use Lattice": "使用晶格",
   "Delete Layer": "删除图层",
-  "New Layer": "新建图层"
+  "New Layer": "新建图层",
+  "Vacuum": "真空",
+  "Set Lengths": "设置长度",
+  "Lattice Operations": "晶格操作",
+  "Scale Lattice (keep atoms fixed)": "缩放晶格 (保持原子固定)",
+  "Set Lattice Lengths (Å) — keep atoms fixed": "设置晶格长度 (Å) — 保持原子固定",
+  "Scale": "缩放"
 }

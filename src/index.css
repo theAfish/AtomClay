@@ -2,13 +2,13 @@
 @tailwind components;
 @tailwind utilities;
 
-body { margin: 0; overflow: hidden; background-color: #0f172a; color: white; }
+body { margin: 0; overflow: hidden; @apply bg-slate-900 text-white; }
 #root { width: 100vw; height: 100vh; }
 canvas { display: block; outline: none; }
 ::-webkit-scrollbar { width: 8px; height: 8px; }
-::-webkit-scrollbar-track { background: #1e293b; }
-::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: #64748b; }
+::-webkit-scrollbar-track { @apply bg-slate-800; }
+::-webkit-scrollbar-thumb { @apply bg-slate-600; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { @apply bg-slate-500; }
 .glass-panel {
     background: rgba(30, 41, 59, 0.9);
     backdrop-filter: blur(12px);

@@ -1,4 +1,9 @@
 // Minimal PDB parser that returns a normalized structure shape
+/**
+ * Parses a PDB file content.
+ * @param {string} text - The content of the PDB file.
+ * @returns {Promise<{atoms: Array<{id: number, element: string, x: number, y: number, z: number}>, lattice: null}>} The parsed atoms and lattice (null for PDB).
+ */
 export async function parse(text) {
     const lines = text.split(/\r?\n/);
     const atoms = [];
@@ -19,6 +24,10 @@ export async function parse(text) {
 
             atoms.push({ id: id++, element, x, y, z });
         }
+    }
+
+    if (atoms.length === 0) {
+        throw new Error("PDB parsing failed: No valid ATOM or HETATM lines found.");
     }
 
     return { atoms, lattice: null };

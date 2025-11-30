@@ -1,4 +1,9 @@
 // Minimal CIF parser with Corrected Matrix Orientation
+/**
+ * Parses a CIF file content.
+ * @param {string} text - The content of the CIF file.
+ * @returns {Promise<{atoms: Array<{element: string, x: number, y: number, z: number}>, lattice: number[][]}>} The parsed atoms and lattice.
+ */
 export async function parse(text) {
     const lines = text.split(/\r?\n/);
     const atoms = [];
@@ -95,7 +100,13 @@ export async function parse(text) {
             const lblIdx = currentLoopHeaders.indexOf('_atom_site_label');
             const symIdx = currentLoopHeaders.indexOf('_atom_site_type_symbol');
 
-            if (xIdx === -1 || yIdx === -1 || zIdx === -1) continue;
+            if (xIdx === -1 || yIdx === -1 || zIdx === -1) {
+                // If we are in an atom loop but missing coordinates, we can't parse atoms.
+                // However, there might be multiple loops. We should only fail if we try to parse a line as an atom and fail.
+                // But here we just continue.
+                // Let's check if we actually found any atoms at the end.
+                continue;
+            }
 
             const parts = line.split(/\s+/);
             if (parts[0].startsWith('data_') || parts[0].startsWith('loop_')) {
@@ -107,6 +118,11 @@ export async function parse(text) {
             const fx = normalize(cleanFloat(parts[xIdx]));
             const fy = normalize(cleanFloat(parts[yIdx]));
             const fz = normalize(cleanFloat(parts[zIdx]));
+
+            if (isNaN(fx) || isNaN(fy) || isNaN(fz)) {
+                 console.warn(`Skipping invalid atom line: ${line}`);
+                 continue;
+            }
 
             let element = symIdx >= 0 ? parts[symIdx] : '';
             const label = lblIdx >= 0 ? parts[lblIdx] : '';
@@ -130,6 +146,10 @@ export async function parse(text) {
 
             atoms.push({ element, x, y, z });
         }
+    }
+
+    if (atoms.length === 0) {
+        throw new Error("CIF parsing failed: No valid atoms found. Ensure '_atom_site_fract_x/y/z' tags are present.");
     }
 
     return { atoms, lattice };

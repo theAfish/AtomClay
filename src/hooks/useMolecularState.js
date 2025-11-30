@@ -1,15 +1,17 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { MathUtils } from '../utils/math';
 import { parse } from '../utils/parsers';
+import { calculateSupercell, calculateVacuum, calculateScaleLattice } from '../utils/structureOperations';
+import { DEFAULTS } from '../constants/defaults';
 
 export function useMolecularState() {
     // Layers State
-    const [layers, setLayers] = useState([{ id: 'layer-0', name: 'Layer 1', visible: true, opacity: 1, lattice: [[10, 0, 0], [0, 10, 0], [0, 0, 10]] }]);
+    const [layers, setLayers] = useState([{ id: 'layer-0', name: 'Layer 1', visible: true, opacity: 1, lattice: DEFAULTS.LATTICE }]);
     const [activeLayerId, setActiveLayerId] = useState('layer-0');
     const [atoms, setAtoms] = useState([]);
 
     // Independent Lattice State (decoupled from active layer)
-    const [currentLattice, setCurrentLattice] = useState([[10, 0, 0], [0, 10, 0], [0, 0, 10]]);
+    const [currentLattice, setCurrentLattice] = useState(DEFAULTS.LATTICE);
     const [currentLatticeSourceId, setCurrentLatticeSourceId] = useState('layer-0');
     const lattice = currentLattice;
 
@@ -21,7 +23,7 @@ export function useMolecularState() {
     // Undo history: stack of { atoms, layers, lattice, activeLayerId, latticeSourceId }
     const historyRef = useRef([]);
     const isUndoingRef = useRef(false);
-    const MAX_HISTORY = 100;
+    const MAX_HISTORY = DEFAULTS.HISTORY.MAX_LENGTH;
 
     const saveStateToHistory = useCallback((prevAtoms, prevLattice, prevLayers, prevActiveId, prevSourceId) => {
         if (isUndoingRef.current) return;
@@ -69,79 +71,53 @@ export function useMolecularState() {
         const currentLatticeVal = lattice;
         if (!currentLatticeVal) return;
 
-        let M = mode === 'diag' ? [[diag[0], 0, 0], [0, diag[1], 0], [0, 0, diag[2]]] : matrix;
-        if (Math.abs(MathUtils.det3x3(M)) < 1e-3) {
-            throw new Error('Invalid Matrix');
-        }
-
-        const newLattice = MathUtils.matMul3x3(M, currentLatticeVal);
-        const invM = MathUtils.inv3x3(M);
-
         // Filter atoms
         const activeAtoms = atoms.filter(a => a.layerId === activeLayerId);
         const otherAtoms = atoms.filter(a => a.layerId !== activeLayerId);
-
-        const newActiveAtoms = [];
+        
         let maxId = atoms.length > 0 ? Math.max(...atoms.map(a => a.id)) : -1;
 
-        const range = Math.ceil(Math.max(...M.flat().map(Math.abs))) + 1;
-        // Assume current atoms store Cartesian, we need fractional in OLD lattice first
-        const invOldL = MathUtils.inv3x3(currentLatticeVal);
-
-        // Pre-calc fractional for active atoms
-        const oldFracs = activeAtoms.map(a => ({ ...a, f: MathUtils.multiplyMatrixVector(invOldL, [a.x, a.y, a.z]) }));
-
-        for (let i = -range; i <= range; i++) {
-            for (let j = -range; j <= range; j++) {
-                for (let k = -range; k <= range; k++) {
-                    oldFracs.forEach(atom => {
-                        const fOldShift = [atom.f[0] + i, atom.f[1] + j, atom.f[2] + k];
-                        // f_new = f_old * M_inv (row vector logic approx)
-                        const [fx, fy, fz] = MathUtils.multiplyMatrixVector(invM, fOldShift);
-
-                        if (fx >= -0.001 && fx < 0.999 && fy >= -0.001 && fy < 0.999 && fz >= -0.001 && fz < 0.999) {
-                            const [cx, cy, cz] = MathUtils.multiplyMatrixVector(newLattice, [fx, fy, fz]);
-                            newActiveAtoms.push({ id: ++maxId, element: atom.element, x: cx, y: cy, z: cz, layerId: activeLayerId });
-                        }
-                    });
-                }
-            }
-        }
+        const { newAtoms, newLattice } = calculateSupercell(activeAtoms, currentLatticeVal, mode, diag, matrix, maxId);
+        
         saveStateToHistory(atoms, lattice, layers, activeLayerId, currentLatticeSourceId);
         setLayers(prev => prev.map(l => l.id === activeLayerId ? { ...l, lattice: newLattice } : l));
         setCurrentLattice(newLattice);
-        setAtoms([...otherAtoms, ...newActiveAtoms]);
+        setAtoms([...otherAtoms, ...newAtoms]);
     }, [atoms, lattice, layers, activeLayerId, saveStateToHistory, currentLatticeSourceId]);
 
     const handleVacuum = useCallback((size, axis = 2) => {
         const currentLatticeVal = lattice;
         if (!currentLatticeVal) return;
         
-        const oldLen = Math.sqrt(currentLatticeVal[axis][0] ** 2 + currentLatticeVal[axis][1] ** 2 + currentLatticeVal[axis][2] ** 2);
-        const ratio = (oldLen + size) / oldLen;
-        const newL = [...currentLatticeVal];
-        newL[axis] = currentLatticeVal[axis].map(v => v * ratio);
+        // Filter atoms for active layer if needed, but vacuum usually applies to the whole cell or active layer's cell
+        // Here we pass all atoms but we might only want to affect active layer's atoms if we were modifying them.
+        // Since calculateVacuum returns identity for atoms, it's safe.
+        const activeAtoms = atoms.filter(a => a.layerId === activeLayerId);
+        const otherAtoms = atoms.filter(a => a.layerId !== activeLayerId);
+
+        const { newAtoms, newLattice } = calculateVacuum(activeAtoms, currentLatticeVal, size, axis);
         
         saveStateToHistory(atoms, lattice, layers, activeLayerId, currentLatticeSourceId);
-        setLayers(prev => prev.map(l => l.id === activeLayerId ? { ...l, lattice: newL } : l));
-        setCurrentLattice(newL);
+        setLayers(prev => prev.map(l => l.id === activeLayerId ? { ...l, lattice: newLattice } : l));
+        setCurrentLattice(newLattice);
+        // If atoms were modified, we would update them here:
+        // setAtoms([...otherAtoms, ...newAtoms]);
     }, [atoms, lattice, layers, activeLayerId, saveStateToHistory, currentLatticeSourceId]);
 
     const handleScaleLattice = useCallback((scaleX = 1, scaleY = 1, scaleZ = 1) => {
         const currentLatticeVal = lattice;
         if (!currentLatticeVal) return;
-        if (!Number.isFinite(scaleX) || !Number.isFinite(scaleY) || !Number.isFinite(scaleZ)) throw new Error('Invalid scale factors');
-        if (scaleX <= 0 || scaleY <= 0 || scaleZ <= 0) throw new Error('Scale factors must be > 0');
         
-        const newL = [
-            [currentLatticeVal[0][0] * scaleX, currentLatticeVal[0][1] * scaleX, currentLatticeVal[0][2] * scaleX],
-            [currentLatticeVal[1][0] * scaleY, currentLatticeVal[1][1] * scaleY, currentLatticeVal[1][2] * scaleY],
-            [currentLatticeVal[2][0] * scaleZ, currentLatticeVal[2][1] * scaleZ, currentLatticeVal[2][2] * scaleZ]
-        ];
+        const activeAtoms = atoms.filter(a => a.layerId === activeLayerId);
+        const otherAtoms = atoms.filter(a => a.layerId !== activeLayerId);
+
+        const { newAtoms, newLattice } = calculateScaleLattice(activeAtoms, currentLatticeVal, scaleX, scaleY, scaleZ);
         
         saveStateToHistory(atoms, lattice, layers, activeLayerId, currentLatticeSourceId);
-        setLayers(prev => prev.map(l => l.id === activeLayerId ? { ...l, lattice: newL } : l));
-        setCurrentLattice(newL);
+        setLayers(prev => prev.map(l => l.id === activeLayerId ? { ...l, lattice: newLattice } : l));
+        setCurrentLattice(newLattice);
+        // If atoms were modified:
+        // setAtoms([...otherAtoms, ...newAtoms]);
     }, [atoms, lattice, layers, activeLayerId, saveStateToHistory, currentLatticeSourceId]);
 
     const addAtoms = useCallback((newAtoms, newLat, createNewLayer = false) => {

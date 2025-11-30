@@ -1,9 +1,19 @@
 // Minimal XYZ parser that returns normalized structure shape
+/**
+ * Parses an XYZ file content.
+ * @param {string} text - The content of the XYZ file.
+ * @returns {Promise<{atoms: Array<{id: number, element: string, x: number, y: number, z: number}>, lattice: number[][]|null}>} The parsed atoms and lattice (if found in comment).
+ */
 export async function parse(text) {
     const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l !== '');
-    if (lines.length < 2) return { atoms: [], lattice: null };
+    if (lines.length < 2) {
+        throw new Error("XYZ parsing failed: File too short (needs at least atom count and comment line).");
+    }
 
     const count = parseInt(lines[0], 10);
+    if (isNaN(count)) {
+        throw new Error("XYZ parsing failed: First line must be the atom count.");
+    }
     const comment = lines[1] || '';
 
     // Try to extract lattice/cell information from comment line
@@ -31,6 +41,10 @@ export async function parse(text) {
         const z = parseFloat(parts[3]);
         if ([x, y, z].some(v => Number.isNaN(v))) continue;
         atoms.push({ id: i, element, x, y, z });
+    }
+
+    if (atoms.length === 0) {
+        throw new Error("XYZ parsing failed: No valid atom lines found.");
     }
 
     return { atoms, lattice };

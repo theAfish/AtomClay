@@ -4,8 +4,12 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js';
 import { getElementProp } from '../constants/elements';
 import { getVdw } from '../constants/atomParams';
+import { COLORS } from '../constants/theme';
+import { DEFAULTS } from '../constants/defaults';
 import { MathUtils } from '../utils/math';
 import { useMolecularContext } from '../context/MolecularContext';
+import { useGizmo } from '../hooks/useGizmo';
+import { useBoxSelection } from '../hooks/useBoxSelection';
 
 const Viewer = () => {
     const {
@@ -15,14 +19,17 @@ const Viewer = () => {
     } = useMolecularContext();
 
     const containerRef = useRef(null);
-    const [selectionBox, setSelectionBox] = useState(null);
     const threeRef = useRef({ 
         scene: null, camera: null, renderer: null, 
         controls: null, transformControl: null,
         atomMeshes: new Map(), // Map<atomId, Mesh>
         controlAnchor: new THREE.Object3D(), // Anchor for multi-selection
         dragStartPos: new THREE.Vector3(),
-        initialAtomPositions: new Map() // Map<atomId, {x,y,z}>
+        initialAtomPositions: new Map(), // Map<atomId, {x,y,z}>
+        atomInstancedMesh: null,
+        instanceIdToAtomId: [],
+        atomIdToInstanceId: new Map(),
+        isInstanced: false
     });
 
     const latestProps = useRef({ atoms, activeLayerId, theme });
@@ -37,6 +44,16 @@ const Viewer = () => {
         } catch (e) { return atoms || []; }
     }, [atoms, layers]);
 
+    // Custom Hooks
+    const drawGizmo = useGizmo(containerRef, threeRef, theme, lattice);
+    const selectionBox = useBoxSelection(containerRef, threeRef, atoms, activeLayerId, onBoxSelect);
+
+    // Keep a ref to the latest drawGizmo function so the animation loop can call it
+    const drawGizmoRef = useRef(drawGizmo);
+    useEffect(() => {
+        drawGizmoRef.current = drawGizmo;
+    }, [drawGizmo]);
+
     // 初始化 Three.js
     useEffect(() => {
         const width = containerRef.current.clientWidth;
@@ -49,16 +66,16 @@ const Viewer = () => {
         if (THREE.Object3D && THREE.Object3D.DefaultUp && THREE.Object3D.DefaultUp.set) {
             THREE.Object3D.DefaultUp.set(0, 0, 1);
         }
-        scene.background = new THREE.Color(0x0f172a);
-        scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-        const dirLight = new THREE.DirectionalLight(0xffffff, 1);
-        dirLight.position.set(10, 10, 10);
+        scene.background = new THREE.Color(COLORS.background.dark);
+        scene.add(new THREE.AmbientLight(COLORS.general.white, DEFAULTS.LIGHTING.AMBIENT_INTENSITY));
+        const dirLight = new THREE.DirectionalLight(COLORS.general.white, DEFAULTS.LIGHTING.DIRECTIONAL_INTENSITY);
+        dirLight.position.set(...DEFAULTS.LIGHTING.DIRECTIONAL_POSITION);
         scene.add(dirLight);
 
-        const camera = new THREE.PerspectiveCamera(45, width/height, 0.1, 1000);
+        const camera = new THREE.PerspectiveCamera(DEFAULTS.CAMERA.FOV, width/height, DEFAULTS.CAMERA.NEAR, DEFAULTS.CAMERA.FAR);
         // Make camera use Z as up as well
         camera.up.set(0, 0, 1);
-        camera.position.set(25, 30, 20);
+        camera.position.set(...DEFAULTS.CAMERA.POSITION);
 
         const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
         renderer.setSize(width, height);
@@ -67,7 +84,7 @@ const Viewer = () => {
 
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
-        controls.target.set(5, 5, 5);
+        controls.target.set(...DEFAULTS.CAMERA.TARGET);
 
         // Transform Controls for Dragging
         const transformControl = new TransformControls(camera, renderer.domElement);
@@ -82,7 +99,11 @@ const Viewer = () => {
             controlAnchor: new THREE.Object3D(),
             dragStartPos: new THREE.Vector3(),
             initialAtomPositions: new Map(),
-            isDragging: false
+            isDragging: false,
+            atomInstancedMesh: null,
+            instanceIdToAtomId: [],
+            atomIdToInstanceId: new Map(),
+            isInstanced: false
         };
 
         const handleResize = () => {
@@ -94,145 +115,15 @@ const Viewer = () => {
         };
         window.addEventListener('resize', handleResize);
 
-        // Gizmo canvas (bottom-left overlay)
-        const gizmoSize = 120;
-        const gizmoCanvas = document.createElement('canvas');
-        gizmoCanvas.style.position = 'absolute';
-        gizmoCanvas.style.left = '10px';
-        gizmoCanvas.style.bottom = '10px';
-        gizmoCanvas.style.width = gizmoSize + 'px';
-        gizmoCanvas.style.height = gizmoSize + 'px';
-        gizmoCanvas.style.pointerEvents = 'none';
-        gizmoCanvas.style.zIndex = 20;
-        const dpr = window.devicePixelRatio || 1;
-        gizmoCanvas.width = Math.round(gizmoSize * dpr);
-        gizmoCanvas.height = Math.round(gizmoSize * dpr);
-        gizmoCanvas.style.background = 'transparent';
-        const gizmoCtx = gizmoCanvas.getContext('2d');
-        containerRef.current.appendChild(gizmoCanvas);
 
-        threeRef.current.gizmoCanvas = gizmoCanvas;
-        threeRef.current.gizmoCtx = gizmoCtx;
-
-        const drawGizmo = () => {
-            const ctx = threeRef.current.gizmoCtx;
-            const canvas = threeRef.current.gizmoCanvas;
-            if (!ctx || !canvas) return;
-
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.save();
-            ctx.scale(dpr, dpr);
-
-            const w = gizmoSize, h = gizmoSize;
-            const cx = w / 2, cy = h / 2;
-            // 将半径稍微调小一点，留出文字标签的空间
-            const radius = Math.min(w, h) * 0.32; 
-
-            // 1. 绘制背景球体 (保持不变)
-            const isDark = latestProps.current.theme === 'dark';
-            ctx.beginPath();
-            ctx.fillStyle = isDark ? 'rgba(15,23,42,0.6)' : 'rgba(255,255,255,0.6)';
-            ctx.strokeStyle = isDark ? 'rgba(148,163,184,0.15)' : 'rgba(148,163,184,0.3)';
-            ctx.lineWidth = 1;
-            ctx.arc(cx, cy, Math.min(w, h) / 2 - 2, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.stroke();
-
-            const latticeLocal = threeRef.current.lattice;
-            const cameraLocal = threeRef.current.camera;
-            if (!latticeLocal || !Array.isArray(latticeLocal) || latticeLocal.length !== 3 || !cameraLocal) {
-                ctx.restore();
-                return;
-            }
-
-            // 2. 准备数据
-            // 这里的关键是先 Normalize 向量，保证它们是标准的方向向量
-            // 如果你希望 Gizmo 反映 lattice 的真实长短比例，可以去掉 .normalize()
-            const axesData = [
-                { vec: new THREE.Vector3(...latticeLocal[0]).normalize(), color: '#ef4444', label: 'a' },
-                { vec: new THREE.Vector3(...latticeLocal[1]).normalize(), color: '#10b981', label: 'b' },
-                { vec: new THREE.Vector3(...latticeLocal[2]).normalize(), color: '#3b82f6', label: 'c' }
-            ];
-
-            const rotMat = new THREE.Matrix3().setFromMatrix4(cameraLocal.matrixWorldInverse);
-            
-            ctx.lineWidth = 2;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.font = '12px sans-serif';
-
-            // 3. 计算投影并排序
-            const projectedAxes = axesData.map(ax => {
-                const v = ax.vec.clone().applyMatrix3(rotMat);
-                // v.x 是屏幕右方向，v.y 是屏幕上方向，v.z 是深度（在 Camera Space 中，负数通常朝前，但在 applyMatrix3 后要看具体坐标系）
-                // 我们直接用 v.x 和 v.y 作为投影长度，因为 v 已经是单位向量了
-                // v.x^2 + v.y^2 的长度自然就是透视短缩后的长度
-                
-                return {
-                    ...ax,
-                    x: v.x,
-                    y: v.y,
-                    z: v.z // 保留 Z 用于排序
-                };
-            });
-
-            // 按 Z 轴排序：从小到大画（假设 Z 越小越远，或者根据 THREE 的坐标系调整）
-            // 在 THREE.js 默认坐标系中，Camera 看向 -Z。所以 Z 越小（越负）离相机越远。
-            // 我们先画远的，再画近的，这样近的轴会盖住远的轴，3D感更强。
-            projectedAxes.sort((a, b) => a.z - b.z);
-
-            // 4. 绘制
-            projectedAxes.forEach(p => {
-                // 如果轴几乎垂直于屏幕（指向用户或背向用户），长度会接近0
-                const len = Math.sqrt(p.x * p.x + p.y * p.y);
-                if (len < 0.001) return;
-
-                // 核心修改：直接使用投影后的分量乘以半径，不再除以 maxLen
-                // 注意：Canvas 的 Y 轴是向下的，而 3D 空间 Y 通常向上，所以这里用 -p.y
-                const ex = cx + p.x * radius; 
-                const ey = cy - p.y * radius; 
-
-                // 设置透明度：如果轴是指向屏幕里面的（背对用户），可以稍微画淡一点，增强立体感
-                // p.z > 0 意味着指向相机背后（屏幕外），p.z < 0 意味着指向屏幕里
-                ctx.globalAlpha = p.z > 0 ? 1.0 : 0.35; 
-
-                ctx.beginPath();
-                ctx.strokeStyle = p.color;
-                ctx.moveTo(cx, cy);
-                ctx.lineTo(ex, ey);
-                ctx.stroke();
-
-                // 箭头绘制 (保持你的逻辑)
-                const angle = Math.atan2(ey - cy, ex - cx);
-                ctx.save();
-                ctx.translate(ex, ey);
-                ctx.rotate(angle);
-                ctx.fillStyle = p.color;
-                ctx.beginPath();
-                ctx.moveTo(0, 0);
-                ctx.lineTo(-6, -4);
-                ctx.lineTo(-6, 4);
-                ctx.closePath();
-                ctx.fill();
-                ctx.restore();
-
-                // 文字标签
-                ctx.save();
-                ctx.globalAlpha = 1.0; // 文字始终不透明
-                ctx.fillStyle = isDark ? '#e6edf3' : '#1e293b';
-                // 文字位置稍微往外推一点
-                ctx.fillText(p.label, ex + Math.cos(angle) * 10, ey + Math.sin(angle) * 10);
-                ctx.restore();
-            });
-
-            ctx.restore();
-        };
 
         const animate = () => {
             requestAnimationFrame(animate);
             controls.update();
             renderer.render(scene, camera);
-            try { drawGizmo(); } catch (e) {}
+            try { 
+                if (drawGizmoRef.current) drawGizmoRef.current(); 
+            } catch (e) {}
         };
         animate();
 
@@ -248,7 +139,7 @@ const Viewer = () => {
         
         const onClick = (e) => {
             const dist = Math.sqrt((e.clientX - mouseDownPos.x)**2 + (e.clientY - mouseDownPos.y)**2);
-            if (dist > 5) return;
+            if (dist > DEFAULTS.INTERACTION.CLICK_DISTANCE_THRESHOLD) return;
 
             // 忽略拖拽结束时的点击
             if (transformControl.dragging || threeRef.current.isDragging) return;
@@ -260,18 +151,35 @@ const Viewer = () => {
             mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
             
             raycaster.setFromCamera(mouse, camera);
-            // 仅检测原子
-            const meshes = Array.from(threeRef.current.atomMeshes.values());
-            const intersects = raycaster.intersectObjects(meshes);
+            
+            let intersects = [];
+            if (threeRef.current.isInstanced && threeRef.current.atomInstancedMesh) {
+                intersects = raycaster.intersectObject(threeRef.current.atomInstancedMesh);
+            } else {
+                const meshes = Array.from(threeRef.current.atomMeshes.values());
+                intersects = raycaster.intersectObjects(meshes);
+            }
             
             // Filter intersects to only include atoms in active layer
             const { atoms: currentAtoms, activeLayerId: currentLayerId } = latestProps.current;
             const activeLayerAtomIds = new Set(currentAtoms.filter(a => a.layerId === currentLayerId).map(a => a.id));
             
-            const validIntersects = intersects.filter(hit => activeLayerAtomIds.has(hit.object.userData.id));
+            const validIntersects = [];
+            for (let hit of intersects) {
+                let atomId;
+                if (threeRef.current.isInstanced) {
+                    atomId = threeRef.current.instanceIdToAtomId[hit.instanceId];
+                } else {
+                    atomId = hit.object.userData.id;
+                }
+                
+                if (activeLayerAtomIds.has(atomId)) {
+                    validIntersects.push(atomId);
+                }
+            }
 
             if (validIntersects.length > 0) {
-                onAtomClick(validIntersects[0].object.userData.id, e.ctrlKey || e.metaKey);
+                onAtomClick(validIntersects[0], e.ctrlKey || e.metaKey);
             } else {
                 onAtomClick(null, e.ctrlKey || e.metaKey); // Deselect or clear
             }
@@ -288,104 +196,11 @@ const Viewer = () => {
         };
     }, []); // Run once
 
-    // Box Selection Logic
-    useEffect(() => {
-        // Container reference
-        const container = containerRef.current;
-        let isSelecting = false;
-        let startPos = { x: 0, y: 0 };
 
-        const onMouseDown = (e) => {
-            if (e.shiftKey && e.button === 0) { // Shift + Left Click
-                isSelecting = true;
-                threeRef.current.isBoxSelecting = true;
-                threeRef.current.controls.enabled = false;
-                const rect = container.getBoundingClientRect();
-                startPos = { x: e.clientX - rect.left, y: e.clientY - rect.top };
-                setSelectionBox({ left: startPos.x, top: startPos.y, width: 0, height: 0 });
-                e.preventDefault(); // Prevent text selection
-            }
-        };
-
-        const onMouseMove = (e) => {
-            if (!isSelecting) return;
-            const rect = container.getBoundingClientRect();
-            const currentX = e.clientX - rect.left;
-            const currentY = e.clientY - rect.top;
-            
-            const left = Math.min(startPos.x, currentX);
-            const top = Math.min(startPos.y, currentY);
-            const width = Math.abs(currentX - startPos.x);
-            const height = Math.abs(currentY - startPos.y);
-            
-            setSelectionBox({ left, top, width, height });
-        };
-
-        const onMouseUp = (e) => {
-            if (!isSelecting) return;
-            isSelecting = false;
-            threeRef.current.controls.enabled = true;
-            
-            // Calculate selection
-            const rect = container.getBoundingClientRect();
-            const currentX = e.clientX - rect.left;
-            const currentY = e.clientY - rect.top;
-            const left = Math.min(startPos.x, currentX);
-            const top = Math.min(startPos.y, currentY);
-            const width = Math.abs(currentX - startPos.x);
-            const height = Math.abs(currentY - startPos.y);
-            const right = left + width;
-            const bottom = top + height;
-
-            // If box is too small, treat as click (handled by click listener)
-            if (width < 5 && height < 5) {
-                setSelectionBox(null);
-                threeRef.current.isBoxSelecting = false;
-                return;
-            }
-
-            const { camera, atomMeshes } = threeRef.current;
-            const selectedIds = [];
-            const { atoms: currentAtoms, activeLayerId: currentLayerId } = latestProps.current;
-            const activeLayerAtomIds = new Set(currentAtoms.filter(a => a.layerId === currentLayerId).map(a => a.id));
-            
-            atomMeshes.forEach((mesh, id) => {
-                const vector = new THREE.Vector3();
-                vector.setFromMatrixPosition(mesh.matrixWorld);
-                vector.project(camera);
-                const x = (vector.x * .5 + .5) * rect.width;
-                const y = (-(vector.y * .5) + .5) * rect.height;
-                
-                if (x >= left && x <= right && y >= top && y <= bottom) {
-                    if (activeLayerAtomIds.has(id)) {
-                        selectedIds.push(id);
-                    }
-                }
-            });
-            
-            onBoxSelect(selectedIds, e.ctrlKey || e.metaKey);
-            setSelectionBox(null);
-            
-            // Reset flag after a short delay to allow click event to be ignored
-            setTimeout(() => {
-                threeRef.current.isBoxSelecting = false;
-            }, 100);
-        };
-
-        container.addEventListener('mousedown', onMouseDown);
-        window.addEventListener('mousemove', onMouseMove);
-        window.addEventListener('mouseup', onMouseUp);
-
-        return () => {
-            container.removeEventListener('mousedown', onMouseDown);
-            window.removeEventListener('mousemove', onMouseMove);
-            window.removeEventListener('mouseup', onMouseUp);
-        };
-    }, [onBoxSelect]);
 
     // 响应 TransformControls 拖拽结束，通知 App 更新坐标
     useEffect(() => {
-        const { transformControl, controlAnchor, atomMeshes, dragStartPos, initialAtomPositions, controls } = threeRef.current;
+        const { transformControl, controlAnchor, atomMeshes, dragStartPos, initialAtomPositions, controls, atomInstancedMesh, isInstanced, atomIdToInstanceId } = threeRef.current;
         // Ensure we have additional tracking for rotation/scale
         if (!threeRef.current.initialAnchorQuaternion) threeRef.current.initialAnchorQuaternion = new THREE.Quaternion();
         if (!threeRef.current.initialAnchorScale) threeRef.current.initialAnchorScale = new THREE.Vector3(1,1,1);
@@ -403,12 +218,24 @@ const Viewer = () => {
                 initialAtomPositions.clear();
                 threeRef.current.initialAtomPositionsRelative.clear();
                 threeRef.current.initialAtomPositionsRelativeLocal = new Map();
+                
+                const dummy = new THREE.Object3D();
+
                 selectedAtomIds.forEach(id => {
-                    if (atomMeshes.has(id)) {
-                        const mesh = atomMeshes.get(id);
-                        initialAtomPositions.set(id, mesh.position.clone());
+                    let pos = null;
+                    if (isInstanced && atomInstancedMesh && atomIdToInstanceId.has(id)) {
+                        const idx = atomIdToInstanceId.get(id);
+                        atomInstancedMesh.getMatrixAt(idx, dummy.matrix);
+                        dummy.matrix.decompose(dummy.position, dummy.quaternion, dummy.scale);
+                        pos = dummy.position.clone();
+                    } else if (atomMeshes.has(id)) {
+                        pos = atomMeshes.get(id).position.clone();
+                    }
+
+                    if (pos) {
+                        initialAtomPositions.set(id, pos);
                         // Store relative position in world space (for translate) and local space (for rotate/scale)
-                        const relWorld = mesh.position.clone().sub(controlAnchor.position);
+                        const relWorld = pos.clone().sub(controlAnchor.position);
                         threeRef.current.initialAtomPositionsRelative.set(id, relWorld);
                         // Convert to local (relative to initial anchor quaternion)
                         const invQ = threeRef.current.initialAnchorQuaternion.clone().invert();
@@ -454,7 +281,7 @@ const Viewer = () => {
                 
                 setTimeout(() => {
                     threeRef.current.isDragging = false;
-                }, 100);
+                }, DEFAULTS.INTERACTION.DRAG_DELAY);
             }
         };
 
@@ -462,38 +289,51 @@ const Viewer = () => {
         const onChange = () => {
             if (transformControl.dragging) {
                 const mode = (threeRef.current.transformMode) || 'translate';
-                if (mode === 'translate') {
-                    const delta = new THREE.Vector3().subVectors(controlAnchor.position, dragStartPos);
-                    selectedAtomIds.forEach(id => {
-                        if (atomMeshes.has(id) && initialAtomPositions.has(id)) {
-                            const mesh = atomMeshes.get(id);
+                const dummy = new THREE.Object3D();
+                
+                selectedAtomIds.forEach(id => {
+                    let newPos = null;
+                    if (initialAtomPositions.has(id)) {
+                        if (mode === 'translate') {
+                            const delta = new THREE.Vector3().subVectors(controlAnchor.position, dragStartPos);
                             const initPos = initialAtomPositions.get(id);
-                            mesh.position.addVectors(initPos, delta);
+                            newPos = new THREE.Vector3().addVectors(initPos, delta);
+                        } else if (mode === 'rotate') {
+                            const q1 = controlAnchor.quaternion.clone();
+                            if (threeRef.current.initialAtomPositionsRelativeLocal.has(id)) {
+                                const relLocal = threeRef.current.initialAtomPositionsRelativeLocal.get(id).clone();
+                                const relNewWorld = relLocal.applyQuaternion(q1);
+                                newPos = controlAnchor.position.clone().add(relNewWorld);
+                            }
+                        } else if (mode === 'scale') {
+                            const s0 = threeRef.current.initialAnchorScale.clone();
+                            const s1 = controlAnchor.scale.clone();
+                            const scaleVec = new THREE.Vector3(s1.x / s0.x, s1.y / s0.y, s1.z / s0.z);
+                            if (threeRef.current.initialAtomPositionsRelativeLocal.has(id)) {
+                                const relLocal = threeRef.current.initialAtomPositionsRelativeLocal.get(id).clone();
+                                const relLocalScaled = new THREE.Vector3(relLocal.x * scaleVec.x, relLocal.y * scaleVec.y, relLocal.z * scaleVec.z);
+                                const relNewWorld = relLocalScaled.applyQuaternion(controlAnchor.quaternion);
+                                newPos = controlAnchor.position.clone().add(relNewWorld);
+                            }
                         }
-                    });
-                } else if (mode === 'rotate') {
-                    const q1 = controlAnchor.quaternion.clone();
-                    selectedAtomIds.forEach(id => {
-                        if (atomMeshes.has(id) && threeRef.current.initialAtomPositionsRelativeLocal.has(id)) {
-                            const mesh = atomMeshes.get(id);
-                            const relLocal = threeRef.current.initialAtomPositionsRelativeLocal.get(id).clone();
-                            const relNewWorld = relLocal.applyQuaternion(q1);
-                            mesh.position.copy(controlAnchor.position.clone().add(relNewWorld));
+                    }
+
+                    if (newPos) {
+                        if (isInstanced && atomInstancedMesh && atomIdToInstanceId.has(id)) {
+                            const idx = atomIdToInstanceId.get(id);
+                            atomInstancedMesh.getMatrixAt(idx, dummy.matrix);
+                            dummy.matrix.decompose(dummy.position, dummy.quaternion, dummy.scale);
+                            dummy.position.copy(newPos);
+                            dummy.updateMatrix();
+                            atomInstancedMesh.setMatrixAt(idx, dummy.matrix);
+                        } else if (atomMeshes.has(id)) {
+                            atomMeshes.get(id).position.copy(newPos);
                         }
-                    });
-                } else if (mode === 'scale') {
-                    const s0 = threeRef.current.initialAnchorScale.clone();
-                    const s1 = controlAnchor.scale.clone();
-                    const scaleVec = new THREE.Vector3(s1.x / s0.x, s1.y / s0.y, s1.z / s0.z);
-                    selectedAtomIds.forEach(id => {
-                        if (atomMeshes.has(id) && threeRef.current.initialAtomPositionsRelativeLocal.has(id)) {
-                            const mesh = atomMeshes.get(id);
-                            const relLocal = threeRef.current.initialAtomPositionsRelativeLocal.get(id).clone();
-                            const relLocalScaled = new THREE.Vector3(relLocal.x * scaleVec.x, relLocal.y * scaleVec.y, relLocal.z * scaleVec.z);
-                            const relNewWorld = relLocalScaled.applyQuaternion(controlAnchor.quaternion);
-                            mesh.position.copy(controlAnchor.position.clone().add(relNewWorld));
-                        }
-                    });
+                    }
+                });
+                
+                if (isInstanced && atomInstancedMesh) {
+                    atomInstancedMesh.instanceMatrix.needsUpdate = true;
                 }
             }
         };
@@ -532,32 +372,32 @@ const Viewer = () => {
     // Update background color based on theme
     useEffect(() => {
         if (threeRef.current.scene) {
-            threeRef.current.scene.background = new THREE.Color(theme === 'dark' ? 0x0f172a : 0xf1f5f9);
+            threeRef.current.scene.background = new THREE.Color(theme === 'dark' ? COLORS.background.dark : COLORS.background.light);
             // Also update fog or other theme related things if needed
         }
     }, [theme]);
 
-    // 同步 Scene (Atom & Lattice)
+    // Sync Scene (Geometry: Atoms, Bonds, Lattice)
     useEffect(() => {
         const { scene, atomMeshes, controlAnchor } = threeRef.current;
 
-        // 1. 清理旧物体
+        // 1. Clear old objects
         const toRemove = [];
         scene.traverse(c => {
-            if(c.userData.type === 'atom' || c.userData.type === 'bond' || c.userData.type === 'box') toRemove.push(c);
+            if(c.userData.type === 'atom' || c.userData.type === 'bond' || c.userData.type === 'box' || c.userData.type === 'atom-instanced') toRemove.push(c);
         });
         toRemove.forEach(c => {
             scene.remove(c);
             if(c.geometry) c.geometry.dispose();
         });
         atomMeshes.clear();
+        threeRef.current.atomInstancedMesh = null;
+        threeRef.current.instanceIdToAtomId = [];
+        threeRef.current.atomIdToInstanceId.clear();
         
-        // Ensure control anchor is in scene (it might have been removed if we cleared everything, but usually we don't clear non-atoms)
-        // Actually traverse above removes based on userData.type. controlAnchor doesn't have type set yet.
-        // Let's make sure controlAnchor is added if not present.
         if (!scene.children.includes(controlAnchor)) scene.add(controlAnchor);
 
-        // 2. 绘制晶胞（仅当 lattice 可用时）
+        // 2. Draw Lattice
         const hasLattice = Array.isArray(lattice) && lattice.length === 3 && lattice.every(v => Array.isArray(v) && v.length === 3);
         if (hasLattice) {
             const boxGeo = new THREE.BufferGeometry();
@@ -570,39 +410,65 @@ const Viewer = () => {
                 pts.push(...pair[0], ...pair[1]);
             });
             boxGeo.setAttribute('position', new THREE.Float32BufferAttribute(pts,3));
-            const boxLine = new THREE.LineSegments(boxGeo, new THREE.LineBasicMaterial({color: theme === 'dark' ? 0x475569 : 0x94a3b8}));
+            const boxLine = new THREE.LineSegments(boxGeo, new THREE.LineBasicMaterial({color: theme === 'dark' ? COLORS.lattice.dark : COLORS.lattice.light}));
             boxLine.userData.type='box';
             scene.add(boxLine);
         }
 
-        // 3. 绘制原子
-        const sphereGeo = new THREE.SphereGeometry(1, 24, 24);
-        visibleAtoms.forEach(atom => {
-            const prop = getElementProp(atom.element);
-            const isSelected = selectedAtomIds.includes(atom.id);
-            const mat = new THREE.MeshStandardMaterial({
-                color: prop.color, roughness: 0.3, metalness: 0.2,
-                emissive: isSelected ? 0x666666 : 0x000000
-            });
-            const mesh = new THREE.Mesh(sphereGeo, mat);
-            mesh.position.set(atom.x, atom.y, atom.z);
-            mesh.scale.setScalar(prop.radius * 0.4);
-            mesh.userData = { type: 'atom', id: atom.id };
-            scene.add(mesh);
-            atomMeshes.set(atom.id, mesh);
-        });
+        // 3. Draw Atoms
+        const isLargeSystem = visibleAtoms.length > DEFAULTS.PERFORMANCE.INSTANCED_MESH_THRESHOLD;
+        threeRef.current.isInstanced = isLargeSystem;
 
-        // 4. 绘制键 (考虑 PBC，如果没有 lattice 则不应用周期性)
+        if (isLargeSystem) {
+            const sphereGeo = new THREE.SphereGeometry(1, DEFAULTS.VISUALS.SPHERE_SEGMENTS, DEFAULTS.VISUALS.SPHERE_SEGMENTS);
+            const mat = new THREE.MeshStandardMaterial({
+                roughness: 0.3, metalness: 0.2,
+                color: COLORS.general.white
+            });
+            const instMesh = new THREE.InstancedMesh(sphereGeo, mat, visibleAtoms.length);
+            const dummy = new THREE.Object3D();
+            
+            visibleAtoms.forEach((atom, i) => {
+                const prop = getElementProp(atom.element);
+                dummy.position.set(atom.x, atom.y, atom.z);
+                dummy.scale.setScalar(prop.radius * DEFAULTS.VISUALS.ATOM_SCALE);
+                dummy.updateMatrix();
+                instMesh.setMatrixAt(i, dummy.matrix);
+                instMesh.setColorAt(i, new THREE.Color(prop.color));
+                
+                threeRef.current.instanceIdToAtomId[i] = atom.id;
+                threeRef.current.atomIdToInstanceId.set(atom.id, i);
+            });
+            
+            instMesh.userData = { type: 'atom-instanced' };
+            scene.add(instMesh);
+            threeRef.current.atomInstancedMesh = instMesh;
+        } else {
+            const sphereGeo = new THREE.SphereGeometry(1, DEFAULTS.VISUALS.SPHERE_SEGMENTS, DEFAULTS.VISUALS.SPHERE_SEGMENTS);
+            visibleAtoms.forEach(atom => {
+                const prop = getElementProp(atom.element);
+                const mat = new THREE.MeshStandardMaterial({
+                    color: prop.color, roughness: 0.3, metalness: 0.2,
+                    emissive: COLORS.general.black
+                });
+                const mesh = new THREE.Mesh(sphereGeo, mat);
+                mesh.position.set(atom.x, atom.y, atom.z);
+                mesh.scale.setScalar(prop.radius * DEFAULTS.VISUALS.ATOM_SCALE);
+                mesh.userData = { type: 'atom', id: atom.id };
+                scene.add(mesh);
+                atomMeshes.set(atom.id, mesh);
+            });
+        }
+
+        // 4. Draw Bonds
         if(visibleAtoms.length < 500) {
-            // Use white color so we can tint with instanceColor
-            const bondMat = new THREE.MeshStandardMaterial({color:0xffffff}); 
-            const bondGeo = new THREE.CylinderGeometry(0.1,0.1,1,6);
+            const bondMat = new THREE.MeshStandardMaterial({color: COLORS.general.white}); 
+            const bondGeo = new THREE.CylinderGeometry(DEFAULTS.VISUALS.BOND_RADIUS, DEFAULTS.VISUALS.BOND_RADIUS, 1, DEFAULTS.VISUALS.BOND_SEGMENTS);
             bondGeo.translate(0,0.5,0); bondGeo.rotateX(Math.PI/2);
             
             const dummy = new THREE.Object3D();
-            const bondSegments = []; // { start, end, color }
+            const bondSegments = []; 
 
-            // Prepare lattice matrices (only if lattice present)
             let latMat = null;
             let invLatMat = null;
             if (hasLattice) {
@@ -622,7 +488,6 @@ const Viewer = () => {
                     
                     let distVector = [p2[0]-p1[0], p2[1]-p1[1], p2[2]-p1[2]];
                     
-                    // Apply PBC if lattice is valid; otherwise keep direct vector
                     if (invLatMat && latMat) {
                         const frac = MathUtils.multiplyMatrixVector(invLatMat, distVector);
                         const fracMic = [
@@ -636,19 +501,17 @@ const Viewer = () => {
                     const distSq = distVector[0]**2 + distVector[1]**2 + distVector[2]**2;
                     const r1 = getVdw(visibleAtoms[i].element);
                     const r2 = getVdw(visibleAtoms[j].element);
-                    const threshold = (r1 + r2) * 0.6; 
+                    const threshold = (r1 + r2) * DEFAULTS.VISUALS.BOND_THRESHOLD_FACTOR; 
 
                     if(distSq < threshold**2){
                         const halfVec = [distVector[0]*0.5, distVector[1]*0.5, distVector[2]*0.5];
                         
-                        // Segment 1: Atom i -> Midpoint
                         bondSegments.push({
                             start: new THREE.Vector3(...p1),
                             end: new THREE.Vector3(p1[0]+halfVec[0], p1[1]+halfVec[1], p1[2]+halfVec[2]),
                             color: new THREE.Color(getElementProp(visibleAtoms[i].element).color)
                         });
 
-                        // Segment 2: Atom j -> Midpoint (from j's perspective, vector is -distVector)
                         bondSegments.push({
                             start: new THREE.Vector3(...p2),
                             end: new THREE.Vector3(p2[0]-halfVec[0], p2[1]-halfVec[1], p2[2]-halfVec[2]),
@@ -674,7 +537,35 @@ const Viewer = () => {
             scene.add(instMesh);
         }
 
-    }, [atoms, lattice, selectedAtomIds, layers, theme]);
+    }, [atoms, lattice, layers, theme]);
+
+    // Update Selection Visuals
+    useEffect(() => {
+        const { atomMeshes, atomInstancedMesh, isInstanced, atomIdToInstanceId } = threeRef.current;
+        
+        if (isInstanced && atomInstancedMesh) {
+            visibleAtoms.forEach((atom) => {
+                const idx = atomIdToInstanceId.get(atom.id);
+                if (idx !== undefined) {
+                    const prop = getElementProp(atom.element);
+                    const isSelected = selectedAtomIds.includes(atom.id);
+                    const color = new THREE.Color(prop.color);
+                    if (isSelected) {
+                        color.add(new THREE.Color(COLORS.selection.emissive)); 
+                    }
+                    atomInstancedMesh.setColorAt(idx, color);
+                }
+            });
+            if (atomInstancedMesh.instanceColor) atomInstancedMesh.instanceColor.needsUpdate = true;
+        } else {
+            atomMeshes.forEach((mesh, id) => {
+                const isSelected = selectedAtomIds.includes(id);
+                if (mesh.material.emissive) {
+                    mesh.material.emissive.set(isSelected ? COLORS.selection.emissive : COLORS.general.black);
+                }
+            });
+        }
+    }, [selectedAtomIds, atoms]);
 
     // 处理选中逻辑和 TransformControls 绑定
     useEffect(() => {
@@ -748,8 +639,8 @@ const Viewer = () => {
                         top: selectionBox.top,
                         width: selectionBox.width,
                         height: selectionBox.height,
-                        border: '1px solid rgba(100, 149, 237, 0.8)',
-                        backgroundColor: 'rgba(100, 149, 237, 0.2)',
+                        border: `1px solid ${COLORS.selection.boxBorder}`,
+                        backgroundColor: COLORS.selection.boxBackground,
                         pointerEvents: 'none',
                         zIndex: 10
                     }}
