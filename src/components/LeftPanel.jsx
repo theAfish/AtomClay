@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Box, Layers, Upload, Download, Grid, ChevronDown, Expand, Eye, EyeOff, Plus, Trash } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
@@ -6,6 +6,7 @@ const LeftPanel = ({
     atomCount, lattice, 
     onLoad, onDownload, 
     onSupercell, onVacuum,
+    onScaleLattice,
     layers = [], setLayers = () => {}, activeLayerId, setActiveLayerId, setLattice = () => {},
     theme = 'dark'
 }) => {
@@ -14,7 +15,22 @@ const LeftPanel = ({
     const [scDiag, setScDiag] = useState([1,1,1]);
     const [scMatrix, setScMatrix] = useState([[1,1,0],[-1,1,0],[0,0,1]]);
     const [vacuum, setVacuum] = useState(15.0);
+    const [scaleVec, setScaleVec] = useState([1,1,1]);
+    const [lenVec, setLenVec] = useState([0,0,0]);
+
+    useEffect(()=>{
+        if(lattice && lattice[0]){
+            setLenVec([
+                Math.sqrt(lattice[0][0]**2 + lattice[0][1]**2 + lattice[0][2]**2),
+                Math.sqrt(lattice[1][0]**2 + lattice[1][1]**2 + lattice[1][2]**2),
+                Math.sqrt(lattice[2][0]**2 + lattice[2][1]**2 + lattice[2][2]**2),
+            ]);
+        }
+    }, [lattice]);
     const [expand, setExpand] = useState(false);
+    const [expandLattice, setExpandLattice] = useState(false);
+    const [latticeTab, setLatticeTab] = useState('vacuum');
+    const [vacuumAxis, setVacuumAxis] = useState(2);
 
     const isDark = theme === 'dark';
     const panelClass = isDark ? "glass-panel" : "bg-white/90 backdrop-blur-xl border border-slate-200";
@@ -83,13 +99,78 @@ const LeftPanel = ({
                             </div>
                         )}
                     </div>
-                    {/* Vacuum */}
-                    <div className="flex gap-2 items-center">
-                        <div className="flex-1">
-                            <label className={`text-xs ${textMuted} block mb-1`}>{t('Vacuum Layer (Å)')}</label>
-                            <input type="number" value={vacuum} onChange={e=>setVacuum(+e.target.value)} className={`w-full ${bgInputDarker} border ${borderClass} rounded px-2 py-1 text-sm ${textPrimary}`}/>
-                        </div>
-                        <button onClick={()=>onVacuum(vacuum)} className={`mt-5 ${buttonSecondary} p-2 rounded`}><Expand size={16}/></button>
+                    {/* Lattice Operations Accordion */}
+                    <div className={`${isDark ? 'bg-slate-900/50' : 'bg-slate-50'} p-2 rounded border ${borderClass}`}>
+                        <button onClick={() => setExpandLattice(!expandLattice)} className={`w-full flex justify-between text-sm ${textSecondary} hover:${textPrimary}`}>
+                            <span className="flex items-center gap-2"><Expand size={16} /> {t('Lattice Operations')}</span>
+                            <ChevronDown size={14} className={`transition ${expandLattice?'rotate-180':''}`} />
+                        </button>
+                        {expandLattice && (
+                            <div className="mt-3 space-y-3">
+                                <div className={`flex gap-2 text-xs border-b ${borderClass} pb-2`}>
+                                    <button onClick={()=>setLatticeTab('vacuum')} className={`flex-1 py-1 rounded ${latticeTab==='vacuum'?'bg-blue-600 text-white':textMuted}`}>{t('Vacuum')}</button>
+                                    <button onClick={()=>setLatticeTab('scale')} className={`flex-1 py-1 rounded ${latticeTab==='scale'?'bg-blue-600 text-white':textMuted}`}>{t('Scale')}</button>
+                                    <button onClick={()=>setLatticeTab('setlength')} className={`flex-1 py-1 rounded ${latticeTab==='setlength'?'bg-blue-600 text-white':textMuted}`}>{t('Set Lengths')}</button>
+                                </div>
+
+                                {latticeTab === 'vacuum' && (
+                                    <div className="space-y-2">
+                                        <div className="flex gap-2">
+                                            <div className="flex-1">
+                                                <label className={`text-xs ${textMuted} block mb-1`}>{t('Vacuum Layer (Å)')}</label>
+                                                <input type="number" value={vacuum} onChange={e=>setVacuum(+e.target.value)} className={`w-full ${bgInputDarker} border ${borderClass} rounded px-2 py-1 text-sm ${textPrimary}`}/>
+                                            </div>
+                                            <div className="w-20">
+                                                <label className={`text-xs ${textMuted} block mb-1`}>Axis</label>
+                                                <select value={vacuumAxis} onChange={e=>setVacuumAxis(+e.target.value)} className={`w-full ${bgInputDarker} border ${borderClass} rounded px-2 py-1 text-sm ${textPrimary}`}>
+                                                    <option value={0}>a</option>
+                                                    <option value={1}>b</option>
+                                                    <option value={2}>c</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <button onClick={()=>onVacuum(vacuum, vacuumAxis)} className={`w-full ${buttonSecondary} p-1 rounded text-xs font-bold`}>{t('Apply')}</button>
+                                    </div>
+                                )}
+
+                                {latticeTab === 'scale' && (
+                                    <div className="space-y-2">
+                                        <label className={`text-xs ${textMuted} block mb-1`}>{t('Scale Lattice (keep atoms fixed)')}</label>
+                                        <div className="flex gap-2">
+                                            {[0,1,2].map(i=>(
+                                                <input key={i} type="number" step="0.01" value={scaleVec[i]} onChange={e=>{const n=[...scaleVec];n[i]=+e.target.value;setScaleVec(n)}} className={`w-full ${bgInputDarker} border ${borderClass} rounded px-2 py-1 text-sm ${textPrimary}`}/>
+                                            ))}
+                                        </div>
+                                        <button onClick={()=>{ onScaleLattice(scaleVec[0]||1, scaleVec[1]||1, scaleVec[2]||1); setScaleVec([1,1,1]); }} className={`w-full ${buttonSecondary} p-1 rounded text-xs font-bold`}>{t('Apply')}</button>
+                                        <div className="text-[10px] mt-1 text-slate-400">Scale factors applied to the lattice vectors a, b and c respectively. Atom coordinates remain unchanged.</div>
+                                    </div>
+                                )}
+
+                                {latticeTab === 'setlength' && (
+                                    <div className="space-y-2">
+                                        <label className={`text-xs ${textMuted} block mb-1`}>{t('Set Lattice Lengths (Å) — keep atoms fixed')}</label>
+                                        <div className="flex gap-2">
+                                            {[0,1,2].map(i=>(
+                                                <input key={i} type="number" step="0.01" value={lenVec[i]} onChange={e=>{const n=[...lenVec];n[i]=+e.target.value;setLenVec(n)}} className={`w-full ${bgInputDarker} border ${borderClass} rounded px-2 py-1 text-sm ${textPrimary}`}/>
+                                            ))}
+                                        </div>
+                                        <button onClick={()=>{
+                                            if(!lattice) return;
+                                            const curLens = [
+                                                Math.sqrt(lattice[0][0]**2 + lattice[0][1]**2 + lattice[0][2]**2),
+                                                Math.sqrt(lattice[1][0]**2 + lattice[1][1]**2 + lattice[1][2]**2),
+                                                Math.sqrt(lattice[2][0]**2 + lattice[2][1]**2 + lattice[2][2]**2),
+                                            ];
+                                            const sx = (lenVec[0] && curLens[0]>0) ? (lenVec[0]/curLens[0]) : 1;
+                                            const sy = (lenVec[1] && curLens[1]>0) ? (lenVec[1]/curLens[1]) : 1;
+                                            const sz = (lenVec[2] && curLens[2]>0) ? (lenVec[2]/curLens[2]) : 1;
+                                            onScaleLattice(sx, sy, sz);
+                                        }} className={`w-full ${buttonSecondary} p-1 rounded text-xs font-bold`}>{t('Apply')}</button>
+                                        <div className="text-[10px] mt-1 text-slate-400">Sets the lattice vector lengths (magnitudes) of a, b and c. The direction of each vector is preserved; atoms remain at the same Cartesian coords.</div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>

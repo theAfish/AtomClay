@@ -325,14 +325,33 @@ function App() {
         setAtoms([...otherAtoms, ...newActiveAtoms]);
     };
 
-    const handleVacuum = (size) => {
-        const oldLen = Math.sqrt(lattice[2][0]**2+lattice[2][1]**2+lattice[2][2]**2);
+    const handleVacuum = (size, axis = 2) => {
+        const oldLen = Math.sqrt(lattice[axis][0]**2+lattice[axis][1]**2+lattice[axis][2]**2);
         const ratio = (oldLen+size)/oldLen;
-        const newL = [lattice[0], lattice[1], lattice[2].map(v=>v*ratio)];
+        const newL = [...lattice];
+        newL[axis] = lattice[axis].map(v=>v*ratio);
         saveStateToHistory(atoms, lattice, layers);
         setLattice(newL);
         setLayers(prev => prev.map(l => l.id === activeLayerId ? { ...l, lattice: newL } : l));
         // Cartesian coords stay same, relative changes (handled by rendering logic)
+    };
+
+    // Scale lattice vectors component-wise while preserving Cartesian atom positions
+    // scaleFactors can be {sx, sy, sz} or a single uniform number
+    const handleScaleLattice = (scaleX = 1, scaleY = 1, scaleZ = 1) => {
+        const activeLayer = layers.find(l => l.id === activeLayerId);
+        const currentLattice = activeLayer?.lattice || lattice;
+        if (!currentLattice) return;
+        if (!Number.isFinite(scaleX) || !Number.isFinite(scaleY) || !Number.isFinite(scaleZ)) return alert('Invalid scale factors');
+        if (scaleX <= 0 || scaleY <= 0 || scaleZ <= 0) return alert('Scale factors must be > 0');
+        const newL = [
+            [currentLattice[0][0]*scaleX, currentLattice[0][1]*scaleX, currentLattice[0][2]*scaleX],
+            [currentLattice[1][0]*scaleY, currentLattice[1][1]*scaleY, currentLattice[1][2]*scaleY],
+            [currentLattice[2][0]*scaleZ, currentLattice[2][1]*scaleZ, currentLattice[2][2]*scaleZ]
+        ];
+        saveStateToHistory(atoms, lattice, layers);
+        setLattice(newL);
+        setLayers(prev => prev.map(l => l.id === activeLayerId ? { ...l, lattice: newL } : l));
     };
 
     const onAtomClick = useCallback((id, isMulti) => {
@@ -499,6 +518,7 @@ function App() {
                 activeLayerId={activeLayerId}
                 setActiveLayerId={setActiveLayerId}
                 setLattice={setLattice}
+                onScaleLattice={handleScaleLattice}
                 theme={theme}
             />
 
