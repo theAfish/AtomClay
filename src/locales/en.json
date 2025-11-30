@@ -1,0 +1,20 @@
+{
+  "Welcome to AtomClay": "Welcome to AtomClay",
+  "Load Molecule": "Load Molecule",
+  "Download": "Download",
+  "Settings": "Settings",
+  "Language": "Language",
+  "English": "English",
+  "Spanish": "Spanish",
+  "Chinese": "Chinese",
+  "Modeling Operations": "Modeling Operations",
+  "Supercell": "Supercell",
+  "Diagonal": "Diagonal",
+  "Matrix": "Matrix",
+  "Apply": "Apply",
+  "Vacuum Layer (Å)": "Vacuum Layer (Å)",
+  "Layers": "Layers",
+  "Use Lattice": "Use Lattice",
+  "Delete Layer": "Delete Layer",
+  "New Layer": "New Layer"
+}

@@ -1,0 +1,20 @@
+{
+  "Welcome to AtomClay": "Bienvenido a AtomClay",
+  "Load Molecule": "Cargar Molécula",
+  "Download": "Descargar",
+  "Settings": "Configuraciones",
+  "Language": "Idioma",
+  "English": "Inglés",
+  "Spanish": "Español",
+  "Chinese": "Chino",
+  "Modeling Operations": "Operaciones de Modelado",
+  "Supercell": "Supercelda",
+  "Diagonal": "Diagonal",
+  "Matrix": "Matriz",
+  "Apply": "Aplicar",
+  "Vacuum Layer (Å)": "Capa de Vacío (Å)",
+  "Layers": "Capas",
+  "Use Lattice": "Usar Red",
+  "Delete Layer": "Eliminar Capa",
+  "New Layer": "Nueva Capa"
+}

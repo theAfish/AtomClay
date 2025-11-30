@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Box, Layers, Upload, Download, Grid, ChevronDown, Expand, Eye, EyeOff, Plus, Trash } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 const LeftPanel = ({ 
     atomCount, lattice, 
@@ -8,6 +9,7 @@ const LeftPanel = ({
     layers = [], setLayers = () => {}, activeLayerId, setActiveLayerId, setLattice = () => {},
     theme = 'dark'
 }) => {
+    const { t } = useTranslation();
     const [scMode, setScMode] = useState('diag');
     const [scDiag, setScDiag] = useState([1,1,1]);
     const [scMatrix, setScMatrix] = useState([[1,1,0],[-1,1,0],[0,0,1]]);
@@ -32,10 +34,10 @@ const LeftPanel = ({
                 </h1>
                 <div className="flex gap-2 mb-4">
                     <label className="flex-1 cursor-pointer bg-blue-600 hover:bg-blue-500 text-white py-2 px-3 rounded-lg flex items-center justify-center gap-2 text-sm transition">
-                        <Upload size={16} /> 导入
+                        <Upload size={16} /> {t('Load Molecule')}
                         <input type="file" className="hidden" onChange={onLoad} />
                     </label>
-                    <button onClick={onDownload} className={`${buttonSecondary} p-2 rounded-lg`} title="导出">
+                    <button onClick={onDownload} className={`${buttonSecondary} p-2 rounded-lg`} title={t('Download')}>
                         <Download size={18} />
                     </button>
                 </div>
@@ -47,20 +49,20 @@ const LeftPanel = ({
 
             <div className={`${panelClass} p-4 rounded-xl shadow-xl pointer-events-auto`}>
                 <h2 className={`text-sm font-bold mb-3 flex items-center gap-2 ${textPrimary}`}>
-                    <Layers size={16} /> 建模操作
+                    <Layers size={16} /> {t('Modeling Operations')}
                 </h2>
                 <div className="space-y-3">
                     {/* Supercell */}
                     <div className={`${isDark ? 'bg-slate-900/50' : 'bg-slate-50'} p-2 rounded border ${borderClass}`}>
                         <button onClick={() => setExpand(!expand)} className={`w-full flex justify-between text-sm ${textSecondary} hover:${textPrimary}`}>
-                            <span className="flex items-center gap-2"><Grid size={16} /> 扩胞 (Supercell)</span>
+                            <span className="flex items-center gap-2"><Grid size={16} /> {t('Supercell')}</span>
                             <ChevronDown size={14} className={`transition ${expand?'rotate-180':''}`} />
                         </button>
                         {expand && (
                             <div className="mt-3 space-y-3">
                                 <div className={`flex gap-2 text-xs border-b ${borderClass} pb-2`}>
-                                    <button onClick={()=>setScMode('diag')} className={`flex-1 py-1 rounded ${scMode==='diag'?'bg-blue-600 text-white':textMuted}`}>对角</button>
-                                    <button onClick={()=>setScMode('matrix')} className={`flex-1 py-1 rounded ${scMode==='matrix'?'bg-blue-600 text-white':textMuted}`}>矩阵</button>
+                                    <button onClick={()=>setScMode('diag')} className={`flex-1 py-1 rounded ${scMode==='diag'?'bg-blue-600 text-white':textMuted}`}>{t('Diagonal')}</button>
+                                    <button onClick={()=>setScMode('matrix')} className={`flex-1 py-1 rounded ${scMode==='matrix'?'bg-blue-600 text-white':textMuted}`}>{t('Matrix')}</button>
                                 </div>
                                 {scMode==='diag' ? (
                                     <div className="flex gap-2 justify-between">
@@ -77,14 +79,14 @@ const LeftPanel = ({
                                         </div>
                                     </div>
                                 )}
-                                <button onClick={()=>onSupercell(scMode, scDiag, scMatrix)} className="w-full bg-blue-600 hover:bg-blue-500 text-white py-1 rounded text-xs font-bold">应用</button>
+                                <button onClick={()=>onSupercell(scMode, scDiag, scMatrix)} className="w-full bg-blue-600 hover:bg-blue-500 text-white py-1 rounded text-xs font-bold">{t('Apply')}</button>
                             </div>
                         )}
                     </div>
                     {/* Vacuum */}
                     <div className="flex gap-2 items-center">
                         <div className="flex-1">
-                            <label className={`text-xs ${textMuted} block mb-1`}>真空层 (Å)</label>
+                            <label className={`text-xs ${textMuted} block mb-1`}>{t('Vacuum Layer (Å)')}</label>
                             <input type="number" value={vacuum} onChange={e=>setVacuum(+e.target.value)} className={`w-full ${bgInputDarker} border ${borderClass} rounded px-2 py-1 text-sm ${textPrimary}`}/>
                         </div>
                         <button onClick={()=>onVacuum(vacuum)} className={`mt-5 ${buttonSecondary} p-2 rounded`}><Expand size={16}/></button>
@@ -94,7 +96,7 @@ const LeftPanel = ({
 
             <div className={`${panelClass} p-4 rounded-xl shadow-xl pointer-events-auto`}>
                 <h2 className={`text-sm font-bold mb-3 flex items-center gap-2 ${textPrimary}`}>
-                    <Layers size={16} /> 图层 (Layers)
+                    <Layers size={16} /> {t('Layers')}
                 </h2>
                 <div className="space-y-2">
                     {layers.map(layer => (
@@ -107,7 +109,7 @@ const LeftPanel = ({
                                     {layer.name}
                                 </button>
                                 {layer.lattice && (
-                                    <button onClick={() => setLattice(layer.lattice)} className={`text-[10px] ml-2 px-2 py-0.5 rounded ${isDark ? 'bg-slate-700 text-slate-200' : 'bg-slate-200 text-slate-700'}`}>Use Lattice</button>
+                                    <button onClick={() => setLattice(layer.lattice)} className={`text-[10px] ml-2 px-2 py-0.5 rounded ${isDark ? 'bg-slate-700 text-slate-200' : 'bg-slate-200 text-slate-700'}`}>{t('Use Lattice')}</button>
                                 )}
                             </div>
                             <div className="flex items-center gap-2">
@@ -128,7 +130,7 @@ const LeftPanel = ({
                                         }
                                         return next;
                                     });
-                                }} className="p-1 text-slate-400 hover:text-red-400" title="删除图层"><Trash size={14}/></button>
+                                }} className="p-1 text-slate-400 hover:text-red-400" title={t('Delete Layer')}><Trash size={14}/></button>
                             </div>
                         </div>
                     ))}
@@ -140,7 +142,7 @@ const LeftPanel = ({
                             const newLayer = { id, name, visible: true, opacity: 1, lattice: lattice ? JSON.parse(JSON.stringify(lattice)) : null };
                             setLayers(prev => [newLayer, ...prev]);
                             setActiveLayerId(id);
-                        }} className="w-full bg-blue-600 hover:bg-blue-500 text-white py-1 rounded text-xs flex items-center justify-center gap-2"><Plus size={14}/> 新建图层</button>
+                        }} className="w-full bg-blue-600 hover:bg-blue-500 text-white py-1 rounded text-xs flex items-center justify-center gap-2"><Plus size={14}/> {t('New Layer')}</button>
                     </div>
                 </div>
             </div>
