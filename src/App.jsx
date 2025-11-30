@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Moon, Sun } from 'lucide-react';
 import Viewer from './components/Viewer';
 import MolstarViewer from './components/MolstarViewer';
 import LeftPanel from './components/LeftPanel';
@@ -398,12 +399,13 @@ function App() {
                 </div>
             )}
 
-            <div className="absolute top-4 right-4 z-50 flex gap-2">
+            <div className="absolute bottom-4 right-4 z-50">
                 <button 
-                    className={`px-3 py-1 rounded shadow text-sm font-medium ${theme === 'dark' ? 'bg-slate-800 text-white' : 'bg-white text-slate-800'}`}
+                    className={`w-12 h-12 rounded-full shadow-lg text-lg font-medium flex items-center justify-center ${theme === 'dark' ? 'bg-slate-800 text-white hover:bg-slate-700' : 'bg-white text-slate-800 hover:bg-slate-100'}`}
                     onClick={() => setTheme(prev => prev === 'dark' ? 'light' : 'dark')}
+                    title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
                 >
-                    {theme === 'dark' ? '🌙 Dark' : '☀️ Light'}
+                    {theme === 'dark' ? <Moon size={20} /> : <Sun size={20} />}
                 </button>
             </div>
 
