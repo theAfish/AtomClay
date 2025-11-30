@@ -4,7 +4,7 @@ import { createPluginUI } from 'molstar/lib/mol-plugin-ui/index';
 import { renderReact18 } from 'molstar/lib/mol-plugin-ui/react18';
 import 'molstar/lib/mol-plugin-ui/skin/light.scss';
 
-export default function MolstarViewer({ pdbContent, structure, visible = true, onClose }) {
+export default function MolstarViewer({ pdbContent, structure, visible = true, onClose, theme = 'dark' }) {
     const parentRef = useRef(null);
     const pluginRef = useRef(null);
 
@@ -30,6 +30,21 @@ export default function MolstarViewer({ pdbContent, structure, visible = true, o
         lines.push('END');
         return lines.join('\n');
     };
+
+    useEffect(() => {
+        if (pluginRef.current) {
+            const canvas = parentRef.current?.querySelector('canvas');
+            if (canvas) {
+                // Mol* canvas background is usually handled by the plugin renderer
+                // But we can try to set the clear color if exposed, or just rely on the container if transparent
+                // Mol* default background is usually white or black depending on skin.
+                // Since we can't easily change skin at runtime without reloading, we might just leave it for now
+                // or try to set the background color via plugin command if we knew it.
+                // For now, let's just set the container background which might show through if transparent
+                parentRef.current.style.backgroundColor = theme === 'dark' ? '#0f172a' : '#f1f5f9';
+            }
+        }
+    }, [theme]);
 
     useEffect(() => {
         let mounted = true;
@@ -60,6 +75,9 @@ export default function MolstarViewer({ pdbContent, structure, visible = true, o
                 });
                 if (mounted) {
                     pluginRef.current = plugin;
+                    // Set initial background
+                    parentRef.current.style.backgroundColor = theme === 'dark' ? '#0f172a' : '#f1f5f9';
+                    
                     let input = pdbContent;
                     if (!input && structure) input = structureToPDB(structure);
                     if (input) {

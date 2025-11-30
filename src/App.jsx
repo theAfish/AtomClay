@@ -19,6 +19,7 @@ function App() {
     const [fileError, setFileError] = useState(null);
     const [pdbContent, setPdbContent] = useState(null);
     const [viewMode, setViewMode] = useState('default'); // 'default' | 'protein'
+    const [theme, setTheme] = useState('dark'); // 'dark' | 'light'
 
     // Layers State (minimal)
     const [layers, setLayers] = useState([{ id: 'layer-0', name: 'Layer 1', visible: true, opacity: 1, lattice: lattice }]);
@@ -397,8 +398,17 @@ function App() {
                 </div>
             )}
 
+            <div className="absolute top-4 right-4 z-50 flex gap-2">
+                <button 
+                    className={`px-3 py-1 rounded shadow text-sm font-medium ${theme === 'dark' ? 'bg-slate-800 text-white' : 'bg-white text-slate-800'}`}
+                    onClick={() => setTheme(prev => prev === 'dark' ? 'light' : 'dark')}
+                >
+                    {theme === 'dark' ? '🌙 Dark' : '☀️ Light'}
+                </button>
+            </div>
+
             {viewMode === 'protein' && pdbContent ? (
-                <MolstarViewer pdbContent={pdbContent} />
+                <MolstarViewer pdbContent={pdbContent} theme={theme} />
             ) : (
                 <Viewer 
                     atoms={atoms}
@@ -409,6 +419,7 @@ function App() {
                     onAtomClick={onAtomClick}
                     onAtomsMoveEnd={onAtomsMoveEnd}
                     onBoxSelect={onBoxSelect}
+                    theme={theme}
                 />
             )}
 <MolstarViewer 
@@ -429,6 +440,7 @@ function App() {
                 activeLayerId={activeLayerId}
                 setActiveLayerId={setActiveLayerId}
                 setLattice={setLattice}
+                theme={theme}
             />
 
             <RightPanel 
@@ -455,6 +467,7 @@ function App() {
                         setSelectedAtomIds([]);
                     }
                 }}
+                theme={theme}
             />
             
             <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-slate-500 text-[10px] pointer-events-none bg-black/20 px-2 rounded">

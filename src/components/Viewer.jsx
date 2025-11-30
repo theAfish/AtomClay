@@ -6,7 +6,7 @@ import { getElementProp } from '../constants/elements';
 import { getVdw } from '../constants/atomParams';
 import { MathUtils } from '../utils/math';
 
-const Viewer = ({ atoms, lattice, layers = [], activeLayerId, selectedAtomIds, onAtomClick, onAtomsMoveEnd, onBoxSelect }) => {
+const Viewer = ({ atoms, lattice, layers = [], activeLayerId, selectedAtomIds, onAtomClick, onAtomsMoveEnd, onBoxSelect, theme = 'dark' }) => {
     const containerRef = useRef(null);
     const [selectionBox, setSelectionBox] = useState(null);
     const threeRef = useRef({ 
@@ -18,10 +18,10 @@ const Viewer = ({ atoms, lattice, layers = [], activeLayerId, selectedAtomIds, o
         initialAtomPositions: new Map() // Map<atomId, {x,y,z}>
     });
 
-    const latestProps = useRef({ atoms, activeLayerId });
+    const latestProps = useRef({ atoms, activeLayerId, theme });
     useEffect(() => {
-        latestProps.current = { atoms, activeLayerId };
-    }, [atoms, activeLayerId]);
+        latestProps.current = { atoms, activeLayerId, theme };
+    }, [atoms, activeLayerId, theme]);
 
     const visibleAtoms = useMemo(() => {
         try {
@@ -122,9 +122,10 @@ const Viewer = ({ atoms, lattice, layers = [], activeLayerId, selectedAtomIds, o
             const radius = Math.min(w, h) * 0.32; 
 
             // 1. 绘制背景球体 (保持不变)
+            const isDark = latestProps.current.theme === 'dark';
             ctx.beginPath();
-            ctx.fillStyle = 'rgba(15,23,42,0.6)';
-            ctx.strokeStyle = 'rgba(148,163,184,0.15)';
+            ctx.fillStyle = isDark ? 'rgba(15,23,42,0.6)' : 'rgba(255,255,255,0.6)';
+            ctx.strokeStyle = isDark ? 'rgba(148,163,184,0.15)' : 'rgba(148,163,184,0.3)';
             ctx.lineWidth = 1;
             ctx.arc(cx, cy, Math.min(w, h) / 2 - 2, 0, Math.PI * 2);
             ctx.fill();
@@ -211,7 +212,7 @@ const Viewer = ({ atoms, lattice, layers = [], activeLayerId, selectedAtomIds, o
                 // 文字标签
                 ctx.save();
                 ctx.globalAlpha = 1.0; // 文字始终不透明
-                ctx.fillStyle = '#e6edf3';
+                ctx.fillStyle = isDark ? '#e6edf3' : '#1e293b';
                 // 文字位置稍微往外推一点
                 ctx.fillText(p.label, ex + Math.cos(angle) * 10, ey + Math.sin(angle) * 10);
                 ctx.restore();
@@ -440,6 +441,14 @@ const Viewer = ({ atoms, lattice, layers = [], activeLayerId, selectedAtomIds, o
     }, [onAtomsMoveEnd, selectedAtomIds]); // Re-bind when selection changes
 
 
+    // Update background color based on theme
+    useEffect(() => {
+        if (threeRef.current.scene) {
+            threeRef.current.scene.background = new THREE.Color(theme === 'dark' ? 0x0f172a : 0xf1f5f9);
+            // Also update fog or other theme related things if needed
+        }
+    }, [theme]);
+
     // 同步 Scene (Atom & Lattice)
     useEffect(() => {
         const { scene, atomMeshes, controlAnchor } = threeRef.current;
@@ -473,7 +482,7 @@ const Viewer = ({ atoms, lattice, layers = [], activeLayerId, selectedAtomIds, o
                 pts.push(...pair[0], ...pair[1]);
             });
             boxGeo.setAttribute('position', new THREE.Float32BufferAttribute(pts,3));
-            const boxLine = new THREE.LineSegments(boxGeo, new THREE.LineBasicMaterial({color:0x475569}));
+            const boxLine = new THREE.LineSegments(boxGeo, new THREE.LineBasicMaterial({color: theme === 'dark' ? 0x475569 : 0x94a3b8}));
             boxLine.userData.type='box';
             scene.add(boxLine);
         }
@@ -577,7 +586,7 @@ const Viewer = ({ atoms, lattice, layers = [], activeLayerId, selectedAtomIds, o
             scene.add(instMesh);
         }
 
-    }, [atoms, lattice, selectedAtomIds, layers]);
+    }, [atoms, lattice, selectedAtomIds, layers, theme]);
 
     // 处理选中逻辑和 TransformControls 绑定
     useEffect(() => {
