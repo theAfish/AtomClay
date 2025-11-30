@@ -1,10 +1,11 @@
 import React from 'react';
-import { Scissors, MousePointer2, Trash2 } from 'lucide-react';
+import { Scissors, MousePointer2, Trash2, Move, RotateCw, Maximize2 } from 'lucide-react';
 import { ELEMENT_DATA } from '../constants/elements';
 
 const RightPanel = ({
     atoms, selectedAtomIds, editMode, setEditMode,
     targetElement, setTargetElement, onApplyEdit, onDelete,
+    transformMode, setTransformMode,
     theme = 'dark'
 }) => {
     const selectedCount = selectedAtomIds.length;
@@ -34,6 +35,21 @@ const RightPanel = ({
                         <Trash2 size={14} /> 删除模式
                     </button>
                 </div>
+
+                {/* Transform Mode Buttons - visible only when in SELECT mode */}
+                {editMode === 'SELECT' && (
+                    <div className={`flex gap-1 mb-4 p-1 rounded ${isDark ? 'bg-slate-900/50' : 'bg-slate-200/50'}`}>
+                        <button onClick={()=>setTransformMode('translate')} className={`flex-1 py-2 rounded text-xs flex flex-col items-center gap-1 ${transformMode==='translate'?'bg-blue-600 text-white':textMuted}`}>
+                            <Move size={14} /> 平移
+                        </button>
+                        <button onClick={()=>setTransformMode('rotate')} className={`flex-1 py-2 rounded text-xs flex flex-col items-center gap-1 ${transformMode==='rotate'?'bg-blue-600 text-white':textMuted}`}>
+                            <RotateCw size={14} /> 旋转
+                        </button>
+                        <button onClick={()=>setTransformMode('scale')} className={`flex-1 py-2 rounded text-xs flex flex-col items-center gap-1 ${transformMode==='scale'?'bg-blue-600 text-white':textMuted}`}>
+                            <Maximize2 size={14} /> 缩放
+                        </button>
+                    </div>
+                )}
 
                 {selectedCount > 0 ? (
                     <div className={`${bgCard} p-3 rounded border ${borderClass} animate-fade-in`}>
@@ -70,7 +86,7 @@ const RightPanel = ({
                     </div>
                 ) : (
                     <div className={`text-xs text-center py-4 italic ${textMuted}`}>
-                        {editMode==='SELECT' ? '点击原子进行选择或拖拽' : '点击原子进行删除'}
+                        {editMode==='SELECT' ? `点击原子进行选择或拖拽 (${transformMode})` : '点击原子进行删除'}
                     </div>
                 )}
             </div>

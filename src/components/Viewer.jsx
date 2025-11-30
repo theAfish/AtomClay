@@ -6,7 +6,7 @@ import { getElementProp } from '../constants/elements';
 import { getVdw } from '../constants/atomParams';
 import { MathUtils } from '../utils/math';
 
-const Viewer = ({ atoms, lattice, layers = [], activeLayerId, selectedAtomIds, onAtomClick, onAtomsMoveEnd, onBoxSelect, theme = 'dark' }) => {
+const Viewer = ({ atoms, lattice, layers = [], activeLayerId, selectedAtomIds, onAtomClick, onAtomsMoveEnd, onBoxSelect, transformMode = 'translate', editMode = 'SELECT', theme = 'dark' }) => {
     const containerRef = useRef(null);
     const [selectionBox, setSelectionBox] = useState(null);
     const threeRef = useRef({ 
@@ -379,6 +379,10 @@ const Viewer = ({ atoms, lattice, layers = [], activeLayerId, selectedAtomIds, o
     // 响应 TransformControls 拖拽结束，通知 App 更新坐标
     useEffect(() => {
         const { transformControl, controlAnchor, atomMeshes, dragStartPos, initialAtomPositions, controls } = threeRef.current;
+        // Ensure we have additional tracking for rotation/scale
+        if (!threeRef.current.initialAnchorQuaternion) threeRef.current.initialAnchorQuaternion = new THREE.Quaternion();
+        if (!threeRef.current.initialAnchorScale) threeRef.current.initialAnchorScale = new THREE.Vector3(1,1,1);
+        if (!threeRef.current.initialAtomPositionsRelative) threeRef.current.initialAtomPositionsRelative = new Map();
         
         const onDragChange = (event) => {
             if (event.value) {
@@ -386,11 +390,23 @@ const Viewer = ({ atoms, lattice, layers = [], activeLayerId, selectedAtomIds, o
                 threeRef.current.isDragging = true;
                 controls.enabled = false;
                 dragStartPos.copy(controlAnchor.position);
+                threeRef.current.initialAnchorPos = controlAnchor.position.clone();
+                threeRef.current.initialAnchorQuaternion.copy(controlAnchor.quaternion);
+                threeRef.current.initialAnchorScale.copy(controlAnchor.scale);
                 initialAtomPositions.clear();
+                threeRef.current.initialAtomPositionsRelative.clear();
+                threeRef.current.initialAtomPositionsRelativeLocal = new Map();
                 selectedAtomIds.forEach(id => {
                     if (atomMeshes.has(id)) {
                         const mesh = atomMeshes.get(id);
                         initialAtomPositions.set(id, mesh.position.clone());
+                        // Store relative position in world space (for translate) and local space (for rotate/scale)
+                        const relWorld = mesh.position.clone().sub(controlAnchor.position);
+                        threeRef.current.initialAtomPositionsRelative.set(id, relWorld);
+                        // Convert to local (relative to initial anchor quaternion)
+                        const invQ = threeRef.current.initialAnchorQuaternion.clone().invert();
+                        const relLocal = relWorld.clone().applyQuaternion(invQ);
+                        threeRef.current.initialAtomPositionsRelativeLocal.set(id, relLocal);
                     }
                 });
             } else {
@@ -399,10 +415,28 @@ const Viewer = ({ atoms, lattice, layers = [], activeLayerId, selectedAtomIds, o
                 const delta = new THREE.Vector3().subVectors(controlAnchor.position, dragStartPos);
                 
                 const moves = [];
+                // Compute final positions depending on transform mode
+                const mode = (threeRef.current.transformMode) || 'translate';
                 selectedAtomIds.forEach(id => {
                     if (initialAtomPositions.has(id)) {
                         const initPos = initialAtomPositions.get(id);
-                        const newPos = new THREE.Vector3().addVectors(initPos, delta);
+                        let newPos = initPos.clone();
+                        if (mode === 'translate') {
+                            newPos.add(delta);
+                        } else if (mode === 'rotate') {
+                            const q1 = controlAnchor.quaternion.clone();
+                            const relLocal = threeRef.current.initialAtomPositionsRelativeLocal.get(id).clone();
+                            const relNewWorld = relLocal.applyQuaternion(q1);
+                            newPos = controlAnchor.position.clone().add(relNewWorld);
+                        } else if (mode === 'scale') {
+                            const s0 = threeRef.current.initialAnchorScale.clone();
+                            const s1 = controlAnchor.scale.clone();
+                            const scaleVec = new THREE.Vector3(s1.x / s0.x, s1.y / s0.y, s1.z / s0.z);
+                            const relLocal = threeRef.current.initialAtomPositionsRelativeLocal.get(id).clone();
+                            const relLocalScaled = new THREE.Vector3(relLocal.x * scaleVec.x, relLocal.y * scaleVec.y, relLocal.z * scaleVec.z);
+                            const relNewWorld = relLocalScaled.applyQuaternion(controlAnchor.quaternion);
+                            newPos = controlAnchor.position.clone().add(relNewWorld);
+                        }
                         moves.push({ id, x: newPos.x, y: newPos.y, z: newPos.z });
                     }
                 });
@@ -420,14 +454,40 @@ const Viewer = ({ atoms, lattice, layers = [], activeLayerId, selectedAtomIds, o
         // Real-time update during drag
         const onChange = () => {
             if (transformControl.dragging) {
-                const delta = new THREE.Vector3().subVectors(controlAnchor.position, dragStartPos);
-                selectedAtomIds.forEach(id => {
-                    if (atomMeshes.has(id) && initialAtomPositions.has(id)) {
-                        const mesh = atomMeshes.get(id);
-                        const initPos = initialAtomPositions.get(id);
-                        mesh.position.addVectors(initPos, delta);
-                    }
-                });
+                const mode = (threeRef.current.transformMode) || 'translate';
+                if (mode === 'translate') {
+                    const delta = new THREE.Vector3().subVectors(controlAnchor.position, dragStartPos);
+                    selectedAtomIds.forEach(id => {
+                        if (atomMeshes.has(id) && initialAtomPositions.has(id)) {
+                            const mesh = atomMeshes.get(id);
+                            const initPos = initialAtomPositions.get(id);
+                            mesh.position.addVectors(initPos, delta);
+                        }
+                    });
+                } else if (mode === 'rotate') {
+                    const q1 = controlAnchor.quaternion.clone();
+                    selectedAtomIds.forEach(id => {
+                        if (atomMeshes.has(id) && threeRef.current.initialAtomPositionsRelativeLocal.has(id)) {
+                            const mesh = atomMeshes.get(id);
+                            const relLocal = threeRef.current.initialAtomPositionsRelativeLocal.get(id).clone();
+                            const relNewWorld = relLocal.applyQuaternion(q1);
+                            mesh.position.copy(controlAnchor.position.clone().add(relNewWorld));
+                        }
+                    });
+                } else if (mode === 'scale') {
+                    const s0 = threeRef.current.initialAnchorScale.clone();
+                    const s1 = controlAnchor.scale.clone();
+                    const scaleVec = new THREE.Vector3(s1.x / s0.x, s1.y / s0.y, s1.z / s0.z);
+                    selectedAtomIds.forEach(id => {
+                        if (atomMeshes.has(id) && threeRef.current.initialAtomPositionsRelativeLocal.has(id)) {
+                            const mesh = atomMeshes.get(id);
+                            const relLocal = threeRef.current.initialAtomPositionsRelativeLocal.get(id).clone();
+                            const relLocalScaled = new THREE.Vector3(relLocal.x * scaleVec.x, relLocal.y * scaleVec.y, relLocal.z * scaleVec.z);
+                            const relNewWorld = relLocalScaled.applyQuaternion(controlAnchor.quaternion);
+                            mesh.position.copy(controlAnchor.position.clone().add(relNewWorld));
+                        }
+                    });
+                }
             }
         };
 
@@ -439,6 +499,27 @@ const Viewer = ({ atoms, lattice, layers = [], activeLayerId, selectedAtomIds, o
             transformControl.removeEventListener('change', onChange);
         };
     }, [onAtomsMoveEnd, selectedAtomIds]); // Re-bind when selection changes
+
+    // Update transform mode
+    useEffect(() => {
+        const { transformControl } = threeRef.current;
+        if (transformControl && transformControl.setMode) {
+            transformControl.setMode(transformMode || 'translate');
+            threeRef.current.transformMode = transformMode;
+            if (editMode !== 'SELECT') {
+                transformControl.enabled = false;
+                try { transformControl.detach(); } catch (e) {}
+            } else {
+                transformControl.enabled = true;
+            }
+
+            // Set transform space to world for translate/scale and local for rotate
+            try {
+                if (transformMode === 'rotate') transformControl.setSpace('local');
+                else transformControl.setSpace('world');
+            } catch (e) {}
+        }
+    }, [transformMode, editMode]);
 
 
     // Update background color based on theme
@@ -592,7 +673,7 @@ const Viewer = ({ atoms, lattice, layers = [], activeLayerId, selectedAtomIds, o
     useEffect(() => {
         const { transformControl, atomMeshes, scene, controlAnchor } = threeRef.current;
         
-        if (selectedAtomIds.length > 0) {
+        if (selectedAtomIds.length > 0 && editMode === 'SELECT') {
             // Calculate centroid
             const center = new THREE.Vector3();
             let count = 0;

@@ -47,6 +47,7 @@ function App() {
     // UI State
     const [selectedAtomIds, setSelectedAtomIds] = useState([]);
     const [editMode, setEditMode] = useState('SELECT');
+    const [transformMode, setTransformMode] = useState('translate'); // translate | rotate | scale
     const [targetElement, setTargetElement] = useState('O');
     const [fileError, setFileError] = useState(null);
     const [pdbContent, setPdbContent] = useState(null);
@@ -466,7 +467,7 @@ function App() {
             {viewMode === 'protein' && pdbContent ? (
                 <MolstarViewer pdbContent={pdbContent} theme={theme} />
             ) : (
-                <Viewer 
+                    <Viewer 
                     atoms={atoms}
                     lattice={lattice}
                     layers={layers}
@@ -476,6 +477,8 @@ function App() {
                     onAtomsMoveEnd={onAtomsMoveEnd}
                     onBoxSelect={onBoxSelect}
                     theme={theme}
+                        transformMode={transformMode}
+                        editMode={editMode}
                 />
             )}
 <MolstarViewer 
@@ -504,6 +507,8 @@ function App() {
                 selectedAtomIds={selectedAtomIds}
                 editMode={editMode}
                 setEditMode={setEditMode}
+                transformMode={transformMode}
+                setTransformMode={setTransformMode}
                 targetElement={targetElement}
                 setTargetElement={setTargetElement}
                 onApplyEdit={() => {
@@ -527,7 +532,7 @@ function App() {
             />
             
             <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-slate-500 text-[10px] pointer-events-none bg-black/20 px-2 rounded">
-                左键: 旋转/选择 | Shift+拖拽: 框选 | 右键: 平移 | 滚轮: 缩放 | 选中原子后拖拽坐标轴移动
+                左键: 旋转/选择 | Shift+拖拽: 框选 | 右键: 平移 | 滚轮: 缩放 | 选中原子后拖拽坐标轴 {transformMode === 'translate' ? '移动' : transformMode === 'rotate' ? '旋转' : '缩放'}
             </div>
         </div>
     );
