@@ -1,16 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Layers, Upload, Download, Grid, ChevronDown, Expand, Eye, EyeOff, Plus, Trash } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { useMolecularContext } from '../context/MolecularContext';
 
-const LeftPanel = ({ 
-    atomCount, lattice, 
-    onLoad, onDownload, 
-    onSupercell, onVacuum,
-    onScaleLattice,
-    layers = [], setLayers = () => {}, activeLayerId, setActiveLayerId, setLattice = () => {},
-    theme = 'dark'
-}) => {
+const LeftPanel = () => {
     const { t } = useTranslation();
+    const {
+        atoms, lattice, 
+        handleLoad, handleDownload, 
+        handleSupercell, handleVacuum,
+        handleScaleLattice,
+        layers, setLayers, activeLayerId, setActiveLayerId, setLattice,
+        theme
+    } = useMolecularContext();
+
+    const atomCount = atoms.length;
+
     const [scMode, setScMode] = useState('diag');
     const [scDiag, setScDiag] = useState([1,1,1]);
     const [scMatrix, setScMatrix] = useState([[1,1,0],[-1,1,0],[0,0,1]]);
@@ -51,9 +56,9 @@ const LeftPanel = ({
                 <div className="flex gap-2 mb-4">
                     <label className="flex-1 cursor-pointer bg-blue-600 hover:bg-blue-500 text-white py-2 px-3 rounded-lg flex items-center justify-center gap-2 text-sm transition">
                         <Upload size={16} /> {t('Load Molecule')}
-                        <input type="file" className="hidden" onChange={onLoad} />
+                        <input type="file" className="hidden" onChange={handleLoad} />
                     </label>
-                    <button onClick={onDownload} className={`${buttonSecondary} p-2 rounded-lg`} title={t('Download')}>
+                    <button onClick={handleDownload} className={`${buttonSecondary} p-2 rounded-lg`} title={t('Download')}>
                         <Download size={18} />
                     </button>
                 </div>
@@ -95,7 +100,7 @@ const LeftPanel = ({
                                         </div>
                                     </div>
                                 )}
-                                <button onClick={()=>onSupercell(scMode, scDiag, scMatrix)} className="w-full bg-blue-600 hover:bg-blue-500 text-white py-1 rounded text-xs font-bold">{t('Apply')}</button>
+                                <button onClick={()=>handleSupercell(scMode, scDiag, scMatrix)} className="w-full bg-blue-600 hover:bg-blue-500 text-white py-1 rounded text-xs font-bold">{t('Apply')}</button>
                             </div>
                         )}
                     </div>
@@ -129,7 +134,7 @@ const LeftPanel = ({
                                                 </select>
                                             </div>
                                         </div>
-                                        <button onClick={()=>onVacuum(vacuum, vacuumAxis)} className={`w-full ${buttonSecondary} p-1 rounded text-xs font-bold`}>{t('Apply')}</button>
+                                        <button onClick={()=>handleVacuum(vacuum, vacuumAxis)} className={`w-full ${buttonSecondary} p-1 rounded text-xs font-bold`}>{t('Apply')}</button>
                                     </div>
                                 )}
 
@@ -141,7 +146,7 @@ const LeftPanel = ({
                                                 <input key={i} type="number" step="0.01" value={scaleVec[i]} onChange={e=>{const n=[...scaleVec];n[i]=+e.target.value;setScaleVec(n)}} className={`w-full ${bgInputDarker} border ${borderClass} rounded px-2 py-1 text-sm ${textPrimary}`}/>
                                             ))}
                                         </div>
-                                        <button onClick={()=>{ onScaleLattice(scaleVec[0]||1, scaleVec[1]||1, scaleVec[2]||1); setScaleVec([1,1,1]); }} className={`w-full ${buttonSecondary} p-1 rounded text-xs font-bold`}>{t('Apply')}</button>
+                                        <button onClick={()=>{ handleScaleLattice(scaleVec[0]||1, scaleVec[1]||1, scaleVec[2]||1); setScaleVec([1,1,1]); }} className={`w-full ${buttonSecondary} p-1 rounded text-xs font-bold`}>{t('Apply')}</button>
                                         <div className="text-[10px] mt-1 text-slate-400">Scale factors applied to the lattice vectors a, b and c respectively. Atom coordinates remain unchanged.</div>
                                     </div>
                                 )}
@@ -164,7 +169,7 @@ const LeftPanel = ({
                                             const sx = (lenVec[0] && curLens[0]>0) ? (lenVec[0]/curLens[0]) : 1;
                                             const sy = (lenVec[1] && curLens[1]>0) ? (lenVec[1]/curLens[1]) : 1;
                                             const sz = (lenVec[2] && curLens[2]>0) ? (lenVec[2]/curLens[2]) : 1;
-                                            onScaleLattice(sx, sy, sz);
+                                            handleScaleLattice(sx, sy, sz);
                                         }} className={`w-full ${buttonSecondary} p-1 rounded text-xs font-bold`}>{t('Apply')}</button>
                                         <div className="text-[10px] mt-1 text-slate-400">Sets the lattice vector lengths (magnitudes) of a, b and c. The direction of each vector is preserved; atoms remain at the same Cartesian coords.</div>
                                     </div>
@@ -190,7 +195,7 @@ const LeftPanel = ({
                                     {layer.name}
                                 </button>
                                 {layer.lattice && (
-                                    <button onClick={() => setLattice(layer.lattice)} className={`text-[10px] ml-2 px-2 py-0.5 rounded ${isDark ? 'bg-slate-700 text-slate-200' : 'bg-slate-200 text-slate-700'}`}>{t('Use Lattice')}</button>
+                                    <button onClick={() => setLattice(layer.lattice, layer.id)} className={`text-[10px] ml-2 px-2 py-0.5 rounded ${isDark ? 'bg-slate-700 text-slate-200' : 'bg-slate-200 text-slate-700'}`}>{t('Use Lattice')}</button>
                                 )}
                             </div>
                             <div className="flex items-center gap-2">

@@ -1,13 +1,18 @@
 import React from 'react';
 import { Scissors, MousePointer2, Trash2, Move, RotateCw, Maximize2 } from 'lucide-react';
 import { ELEMENT_DATA } from '../constants/elements';
+import { useMolecularContext } from '../context/MolecularContext';
 
-const RightPanel = ({
-    atoms, selectedAtomIds, editMode, setEditMode,
-    targetElement, setTargetElement, onApplyEdit, onDelete,
-    transformMode, setTransformMode,
-    theme = 'dark'
-}) => {
+const RightPanel = () => {
+    const {
+        atoms, selectedAtomIds, setSelectedAtomIds,
+        editMode, setEditMode,
+        targetElement, setTargetElement,
+        transformMode, setTransformMode,
+        updateAtoms,
+        theme
+    } = useMolecularContext();
+
     const selectedCount = selectedAtomIds.length;
     const selAtom = selectedCount === 1 ? atoms.find(a => a.id === selectedAtomIds[0]) : null;
 
@@ -20,6 +25,19 @@ const RightPanel = ({
     const bgCard = isDark ? "bg-slate-800/50" : "bg-slate-50";
     const borderClass = isDark ? "border-slate-700/50" : "border-slate-200";
     const bgMetric = isDark ? "bg-slate-900" : "bg-slate-200";
+
+    const onApplyEdit = () => {
+        if(selectedAtomIds.length > 0) {
+            updateAtoms(prev => prev.map(a => selectedAtomIds.includes(a.id) ? { ...a, element: targetElement } : a));
+        }
+    };
+
+    const onDelete = () => {
+        if(selectedAtomIds.length > 0) {
+            updateAtoms(prev => prev.filter(a => !selectedAtomIds.includes(a.id)));
+            setSelectedAtomIds([]);
+        }
+    };
 
     return (
         <div className="absolute top-4 right-4 w-64 pointer-events-none">

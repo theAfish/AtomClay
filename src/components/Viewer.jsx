@@ -5,8 +5,15 @@ import { TransformControls } from 'three/examples/jsm/controls/TransformControls
 import { getElementProp } from '../constants/elements';
 import { getVdw } from '../constants/atomParams';
 import { MathUtils } from '../utils/math';
+import { useMolecularContext } from '../context/MolecularContext';
 
-const Viewer = ({ atoms, lattice, layers = [], activeLayerId, selectedAtomIds, onAtomClick, onAtomsMoveEnd, onBoxSelect, transformMode = 'translate', editMode = 'SELECT', theme = 'dark' }) => {
+const Viewer = () => {
+    const {
+        atoms, lattice, layers, activeLayerId,
+        selectedAtomIds, onAtomClick, onAtomsMoveEnd, onBoxSelect,
+        transformMode, editMode, theme
+    } = useMolecularContext();
+
     const containerRef = useRef(null);
     const [selectionBox, setSelectionBox] = useState(null);
     const threeRef = useRef({ 
@@ -687,6 +694,8 @@ const Viewer = ({ atoms, lattice, layers = [], activeLayerId, selectedAtomIds, o
             if (count > 0) {
                 center.divideScalar(count);
                 controlAnchor.position.copy(center);
+                controlAnchor.quaternion.identity();
+                controlAnchor.scale.set(1, 1, 1);
                 controlAnchor.updateMatrixWorld();
                 
                 transformControl.attach(controlAnchor);
