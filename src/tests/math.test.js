@@ -24,6 +24,17 @@ describe('MathUtils', () => {
             const result = MathUtils.multiplyMatrixVector(matrix, vector);
             expect(result).toEqual([2, 4, 6]);
         });
+
+        it('should handle non-symmetric matrices correctly', () => {
+            const matrix = [
+                [1, 2, 3],
+                [4, 5, 6],
+                [7, 8, 9]
+            ];
+            const vector = [1, 1, 1];
+            const result = MathUtils.multiplyMatrixVector(matrix, vector);
+            expect(result).toEqual([6, 15, 24]);
+        });
     });
 
     describe('det3x3', () => {

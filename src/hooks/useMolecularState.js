@@ -171,6 +171,13 @@ export function useMolecularState() {
         });
     }, [lattice, layers, activeLayerId, saveStateToHistory, currentLatticeSourceId]);
 
+    const renameLayer = useCallback((layerId, newName) => {
+        setLayers(prev => {
+            saveStateToHistory(atoms, lattice, prev, activeLayerId, currentLatticeSourceId);
+            return prev.map(l => l.id === layerId ? { ...l, name: newName } : l);
+        });
+    }, [atoms, lattice, activeLayerId, saveStateToHistory, currentLatticeSourceId]);
+
     return {
         atoms,
         lattice,
@@ -186,6 +193,7 @@ export function useMolecularState() {
         handleScaleLattice,
         addAtoms,
         updateAtoms,
+        renameLayer,
         saveStateToHistory
     };
 }

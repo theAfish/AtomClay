@@ -34,6 +34,7 @@ export const MolecularProvider = ({ children }) => {
         handleScaleLattice: handleScaleLatticeOp,
         addAtoms,
         updateAtoms
+        , renameLayer
     } = molecularState;
 
     // UI State
@@ -122,7 +123,7 @@ export const MolecularProvider = ({ children }) => {
                                 const cds = line.split(/\s+/).slice(0,3).map(Number);
                                 if (cds.length < 3 || cds.some(v => !Number.isFinite(v))) { reject(new Error('POSCAR-like parse failed: invalid coordinates.')); return; }
                                 let x,y,z;
-                                if(isDirect) [x,y,z] = MathUtils.multiplyMatrixVector(lat, cds);
+                                if(isDirect) [x,y,z] = MathUtils.multiplyMatrixVector(MathUtils.transpose3x3(lat), cds);
                                 else [x,y,z] = cds;
                                 newAtoms.push({id: gId++, element: el, x, y, z});
                             }
@@ -174,9 +175,10 @@ export const MolecularProvider = ({ children }) => {
         const els=Object.keys(groups);
         s+=` ${els.join(' ')}\n ${els.map(e=>groups[e].length).join(' ')}\nDirect\n`;
         const invL = MathUtils.inv3x3(lattice);
+        const invLT = MathUtils.transpose3x3(invL);
         els.forEach(e=>{
             groups[e].forEach(a=>{
-                const [fx,fy,fz] = MathUtils.multiplyMatrixVector(invL, [a.x,a.y,a.z]);
+                const [fx,fy,fz] = MathUtils.multiplyMatrixVector(invLT, [a.x,a.y,a.z]);
                 const w = v => (v-Math.floor(v+0.0001)).toFixed(6);
                 s+=` ${w(fx)} ${w(fy)} ${w(fz)}\n`;
             });
@@ -307,6 +309,7 @@ export const MolecularProvider = ({ children }) => {
         handleDragOver,
         handleDrop,
         changeLanguage
+        , renameLayer
     };
 
     return (

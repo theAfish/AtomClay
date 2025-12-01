@@ -1,4 +1,5 @@
 {
+  "app.title": "AtomClay — Web 原子结构建模工具",
   "Welcome to AtomClay": "欢迎使用 AtomClay",
   "Load Molecule": "导入",
   "Download": "导出",
@@ -16,11 +17,20 @@
   "Layers": "图层",
   "Use Lattice": "使用晶格",
   "Delete Layer": "删除图层",
+  "Rename Layer": "重命名图层",
   "New Layer": "新建图层",
   "Vacuum": "真空",
   "Set Lengths": "设置长度",
   "Lattice Operations": "晶格操作",
   "Scale Lattice (keep atoms fixed)": "缩放晶格 (保持原子固定)",
   "Set Lattice Lengths (Å) — keep atoms fixed": "设置晶格长度 (Å) — 保持原子固定",
-  "Scale": "缩放"
+  "Scale": "缩放",
+  "Active Layer": "当前图层",
+  "None": "无",
+  "Atoms in layer": "图层原子数",
+  "Total atoms": "原子总数",
+  "Chemical Formula": "化学式",
+  "Lattice Vectors": "晶格向量",
+  "Cell Volume": "晶胞体积",
+  "No lattice information": "无晶格信息"
 }

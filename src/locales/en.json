@@ -1,4 +1,5 @@
 {
+  "app.title": "AtomClay — Web Atomic Structure Modeling Tool",
   "Welcome to AtomClay": "Welcome to AtomClay",
   "Load Molecule": "Load Molecule",
   "Download": "Download",
@@ -22,5 +23,14 @@
   "Layers": "Layers",
   "Use Lattice": "Use Lattice",
   "Delete Layer": "Delete Layer",
-  "New Layer": "New Layer"
+  "Rename Layer": "Rename Layer",
+  "New Layer": "New Layer",
+  "Active Layer": "Active Layer",
+  "None": "None",
+  "Atoms in layer": "Atoms in layer",
+  "Total atoms": "Total atoms",
+  "Chemical Formula": "Chemical Formula",
+  "Lattice Vectors": "Lattice Vectors",
+  "Cell Volume": "Cell Volume",
+  "No lattice information": "No lattice information"
 }

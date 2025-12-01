@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import Viewer from './components/Viewer';
 import MolstarViewer from './components/MolstarViewer';
 import LeftPanel from './components/LeftPanel';
@@ -18,6 +19,12 @@ function AppContent() {
         handleDragOver,
         handleDrop
     } = useMolecularContext();
+
+    const { t, i18n } = useTranslation();
+
+    useEffect(() => {
+        document.title = t('app.title', { defaultValue: 'AtomClay' });
+    }, [i18n.language, t]);
 
     return (
         <div className="relative w-full h-full font-sans select-none" onDragOver={handleDragOver} onDrop={handleDrop}>

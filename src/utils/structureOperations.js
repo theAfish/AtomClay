@@ -29,20 +29,23 @@ export function calculateSupercell(atoms, lattice, mode, diag, matrix, startId =
     if (!invOldL) {
         throw new Error('Invalid lattice: determinant is zero or near zero');
     }
+    const invOldLT = MathUtils.transpose3x3(invOldL);
 
     // Pre-calc fractional for atoms
-    const oldFracs = atoms.map(a => ({ ...a, f: MathUtils.multiplyMatrixVector(invOldL, [a.x, a.y, a.z]) }));
+    const oldFracs = atoms.map(a => ({ ...a, f: MathUtils.multiplyMatrixVector(invOldLT, [a.x, a.y, a.z]) }));
 
     for (let i = -range; i <= range; i++) {
         for (let j = -range; j <= range; j++) {
             for (let k = -range; k <= range; k++) {
                 oldFracs.forEach(atom => {
                     const fOldShift = [atom.f[0] + i, atom.f[1] + j, atom.f[2] + k];
-                    // f_new = f_old * M_inv (row vector logic approx)
-                    const [fx, fy, fz] = MathUtils.multiplyMatrixVector(invM, fOldShift);
+                    // f_new = (M^-1)^T * f_old
+                    // We need transpose of invM because multiplyMatrixVector does A*v
+                    const [fx, fy, fz] = MathUtils.multiplyMatrixVector(MathUtils.transpose3x3(invM), fOldShift);
 
                     if (fx >= -0.001 && fx < 0.999 && fy >= -0.001 && fy < 0.999 && fz >= -0.001 && fz < 0.999) {
-                        const [cx, cy, cz] = MathUtils.multiplyMatrixVector(newLattice, [fx, fy, fz]);
+                        // r = L_new^T * f_new
+                        const [cx, cy, cz] = MathUtils.multiplyMatrixVector(MathUtils.transpose3x3(newLattice), [fx, fy, fz]);
                         // Preserve other properties of atom, but update id and coords
                         const { f, id, x, y, z, ...rest } = atom; 
                         newAtoms.push({ ...rest, id: ++currentId, x: cx, y: cy, z: cz });

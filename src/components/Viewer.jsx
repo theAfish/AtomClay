@@ -491,14 +491,17 @@ const Viewer = () => {
                     if (invLatMat && latMat) {
                         const frac = MathUtils.multiplyMatrixVector(invLatMat, distVector);
                         const fracMic = [
-                            frac[0] - Math.round(frac[0]),
-                            frac[1] - Math.round(frac[1]),
-                            frac[2] - Math.round(frac[2])
+                            frac[0] - Math.floor(frac[0] + 0.5),
+                            frac[1] - Math.floor(frac[1] + 0.5),
+                            frac[2] - Math.floor(frac[2] + 0.5)
                         ];
                         distVector = MathUtils.multiplyMatrixVector(latMat, fracMic);
                     }
 
                     const distSq = distVector[0]**2 + distVector[1]**2 + distVector[2]**2;
+                    
+                    if (distSq < 1e-6) continue;
+
                     const r1 = getVdw(visibleAtoms[i].element);
                     const r2 = getVdw(visibleAtoms[j].element);
                     const threshold = (r1 + r2) * DEFAULTS.VISUALS.BOND_THRESHOLD_FACTOR; 

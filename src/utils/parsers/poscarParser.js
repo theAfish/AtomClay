@@ -51,7 +51,7 @@ export async function parse(text) {
             const cds = line.split(/\s+/).slice(0,3).map(Number);
             if (cds.length < 3 || cds.some(v => !Number.isFinite(v))) { throw new Error('POSCAR-like parse failed: invalid coordinates.'); }
             let x,y,z;
-            if(isDirect) [x,y,z] = MathUtils.multiplyMatrixVector(lat, cds);
+            if(isDirect) [x,y,z] = MathUtils.multiplyMatrixVector(MathUtils.transpose3x3(lat), cds);
             else [x,y,z] = cds;
             newAtoms.push({id: gId++, element: el, x, y, z});
         }

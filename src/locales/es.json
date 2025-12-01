@@ -1,4 +1,5 @@
 {
+  "app.title": "AtomClay — Herramienta Web de Modelado Atómico",
   "Welcome to AtomClay": "Bienvenido a AtomClay",
   "Load Molecule": "Cargar Molécula",
   "Download": "Descargar",
@@ -16,11 +17,20 @@
   "Layers": "Capas",
   "Use Lattice": "Usar Red",
   "Delete Layer": "Eliminar Capa",
+  "Rename Layer": "Renombrar Capa",
   "New Layer": "Nueva Capa",
   "Vacuum": "Vacío",
   "Set Lengths": "Establecer Longitudes",
   "Lattice Operations": "Operaciones de Red",
   "Scale Lattice (keep atoms fixed)": "Escalar Red (mantener átomos fijos)",
   "Set Lattice Lengths (Å) — keep atoms fixed": "Establecer Longitudes de Red (Å) — mantener átomos fijos",
-  "Scale": "Escala"
+  "Scale": "Escala",
+  "Active Layer": "Capa Activa",
+  "None": "Ninguna",
+  "Atoms in layer": "Átomos en capa",
+  "Total atoms": "Átomos totales",
+  "Chemical Formula": "Fórmula química",
+  "Lattice Vectors": "Vectores de red",
+  "Cell Volume": "Volumen de celda",
+  "No lattice information": "Sin información de red"
 }

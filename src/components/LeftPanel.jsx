@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Layers, Upload, Download, Grid, ChevronDown, Expand, Eye, EyeOff, Plus, Trash } from 'lucide-react';
+import { Box, Layers, Upload, Download, Grid, ChevronDown, Expand, Eye, EyeOff, Plus, Trash, Check, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useMolecularContext } from '../context/MolecularContext';
+import { MathUtils } from '../utils/math';
+import { StructureInfo } from '../utils/structureInfo';
 
 const LeftPanel = () => {
     const { t } = useTranslation();
@@ -11,10 +13,30 @@ const LeftPanel = () => {
         handleSupercell, handleVacuum,
         handleScaleLattice,
         layers, setLayers, activeLayerId, setActiveLayerId, setLattice,
-        theme
+        theme,
+        renameLayer,
     } = useMolecularContext();
 
     const atomCount = atoms.length;
+    const activeLayer = layers.find(l => l.id === activeLayerId) || null;
+    const layerAtoms = atoms.filter(a => a.layerId === activeLayerId);
+    const layerAtomCount = layerAtoms.length;
+    const totalAtomCount = atoms.length;
+
+    const formula = StructureInfo.getCompositionString(layerAtoms);
+
+    // Lattice to display (layer lattice takes precedence)
+    const latticeToShow = (activeLayer && activeLayer.lattice) ? activeLayer.lattice : lattice;
+    const latticeExists = Array.isArray(latticeToShow) && latticeToShow.length === 3 && Array.isArray(latticeToShow[0]);
+    let latticeLens = [0,0,0];
+    if (latticeExists) {
+        latticeLens = [
+            Math.sqrt(latticeToShow[0][0]**2 + latticeToShow[0][1]**2 + latticeToShow[0][2]**2),
+            Math.sqrt(latticeToShow[1][0]**2 + latticeToShow[1][1]**2 + latticeToShow[1][2]**2),
+            Math.sqrt(latticeToShow[2][0]**2 + latticeToShow[2][1]**2 + latticeToShow[2][2]**2),
+        ];
+    }
+    const volume = latticeExists ? Math.abs(MathUtils.det3x3(latticeToShow)) : null;
 
     const [scMode, setScMode] = useState('diag');
     const [scDiag, setScDiag] = useState([1,1,1]);
@@ -36,6 +58,11 @@ const LeftPanel = () => {
     const [expandLattice, setExpandLattice] = useState(false);
     const [latticeTab, setLatticeTab] = useState('vacuum');
     const [vacuumAxis, setVacuumAxis] = useState(2);
+    // Two separate editing states: one for the header (active layer) and one for the layers list
+    const [editingActiveLayerId, setEditingActiveLayerId] = useState(null);
+    const [editingActiveName, setEditingActiveName] = useState('');
+    const [editingLayerId, setEditingLayerId] = useState(null);
+    const [editingName, setEditingName] = useState('');
 
     const isDark = theme === 'dark';
     const panelClass = isDark ? "glass-panel" : "bg-white/90 backdrop-blur-xl border border-slate-200";
@@ -63,8 +90,39 @@ const LeftPanel = () => {
                     </button>
                 </div>
                 <div className={`text-xs font-mono p-2 rounded border ${isDark ? 'bg-slate-800 text-slate-300 border-slate-700' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>
-                    <p>Atom Count: {atomCount}</p>
-                    <p>Cell: {lattice && lattice[0] ? `${Math.sqrt(lattice[0][0]**2+lattice[0][1]**2+lattice[0][2]**2).toFixed(2)} Å` : 'N/A'}</p>
+                    <p className="font-bold">{t('Active Layer')}: {activeLayer ? (
+                        <span className="inline-flex items-center gap-2">
+                            {editingActiveLayerId === activeLayer.id ? (
+                                <span className="inline-flex items-center gap-2">
+                                    <input autoFocus type="text" value={editingActiveName} onChange={e=>setEditingActiveName(e.target.value)} onKeyDown={e=>{
+                                        if(e.key === 'Enter') { renameLayer(activeLayer.id, editingActiveName || activeLayer.name); setEditingActiveLayerId(null); setEditingActiveName(''); }
+                                        if(e.key === 'Escape') { setEditingActiveLayerId(null); setEditingActiveName(''); }
+                                    }} className={`flex-1 min-w-0 max-w-[200px] h-6 leading-tight text-sm ${bgInput} border ${borderClass} rounded px-2 ${textPrimary}`} />
+                                    <button onClick={() => { renameLayer(activeLayer.id, editingActiveName || activeLayer.name); setEditingActiveLayerId(null); setEditingActiveName(''); }} className="p-1 text-green-400" title="Save"><Check size={14} /></button>
+                                    <button onClick={() => { setEditingActiveLayerId(null); setEditingActiveName(''); }} className="p-1 text-slate-400" title="Cancel"><X size={14} /></button>
+                                </span>
+                            ) : (
+                                <span className="inline-flex items-center gap-2">
+                                    <span onDoubleClick={() => { setEditingActiveLayerId(activeLayer.id); setEditingActiveName(activeLayer.name); }}>{activeLayer.name}</span>
+                                </span>
+                            )}
+                        </span>
+                    ) : t('None')}</p>
+                    <p>{t('Atoms in layer')}: <span className="font-semibold">{layerAtomCount}</span> &nbsp;|&nbsp; {t('Total atoms')}: <span className="font-semibold">{totalAtomCount}</span></p>
+                    <p>{t('Chemical Formula')}: <span className="font-bold">{formula || 'N/A'}</span></p>
+                    <div className="mt-2">
+                        <div className="text-xs mb-1 font-semibold">{t('Lattice Vectors')}:</div>
+                        {latticeExists ? (
+                            <div className="space-y-1 text-[11px]">
+                                <div>a: ({latticeToShow[0].map(v => v.toFixed(3)).join(', ')}) — {latticeLens[0].toFixed(3)} Å</div>
+                                <div>b: ({latticeToShow[1].map(v => v.toFixed(3)).join(', ')}) — {latticeLens[1].toFixed(3)} Å</div>
+                                <div>c: ({latticeToShow[2].map(v => v.toFixed(3)).join(', ')}) — {latticeLens[2].toFixed(3)} Å</div>
+                                <div className="text-slate-400 mt-1">{t('Cell Volume')}: {volume !== null ? `${volume.toFixed(3)} Å³` : 'N/A'}</div>
+                            </div>
+                        ) : (
+                            <div className="text-[11px] text-slate-400">{t('No lattice information')}</div>
+                        )}
+                    </div>
                 </div>
             </div>
 
@@ -186,16 +244,30 @@ const LeftPanel = () => {
                 </h2>
                 <div className="space-y-2">
                     {layers.map(layer => (
-                        <div key={layer.id} className={`flex items-center justify-between p-2 rounded ${activeLayerId===layer.id? (isDark ? 'bg-slate-800 border border-slate-600' : 'bg-slate-100 border border-slate-300') : (isDark ? 'bg-slate-900/40' : 'bg-slate-50/50')}`}>
-                            <div className="flex items-center gap-2">
+                        // Fix: keep consistent row height so inserting an editing <input> doesn't expand the row vertically
+                        <div key={layer.id} className={`flex items-center justify-between p-2 rounded h-10 ${activeLayerId===layer.id? (isDark ? 'bg-slate-800 border border-slate-600' : 'bg-slate-100 border border-slate-300') : (isDark ? 'bg-slate-900/40' : 'bg-slate-50/50')}`}>
+                            {/* Left cluster should be able to shrink so that buttons won't be pushed out; min-w-0 and flex-1 lets inputs truncate instead of wrapping */}
+                            <div className="flex-1 min-w-0 flex items-center gap-2">
                                 <button onClick={() => setLayers(prev => prev.map(l => l.id===layer.id? {...l, visible: !l.visible}: l))} className={`p-1 ${textPrimary}`}>
                                     {layer.visible ? <Eye size={16} /> : <EyeOff size={16} />}
                                 </button>
-                                <button onClick={() => setActiveLayerId(layer.id)} className={`text-sm text-left ${activeLayerId===layer.id? (isDark ? 'text-white' : 'text-blue-600 font-bold') : textSecondary}`}>
-                                    {layer.name}
-                                </button>
+                                {editingLayerId === layer.id ? (
+                                    <div className="flex items-center gap-2 h-full">
+                                        <input autoFocus type="text" value={editingName} onChange={e=>setEditingName(e.target.value)} onKeyDown={e=>{
+                                            if(e.key === 'Enter') { renameLayer(layer.id, editingName || layer.name); setEditingLayerId(null); setEditingName(''); }
+                                            if(e.key === 'Escape') { setEditingLayerId(null); setEditingName(''); }
+                                        }} className={`flex-1 min-w-0 max-w-[240px] h-6 leading-tight text-sm ${bgInput} border ${borderClass} rounded px-2 ${textPrimary}`} />
+                                        <button onClick={() => { renameLayer(layer.id, editingName || layer.name); setEditingLayerId(null); setEditingName(''); }} className="p-1 text-green-400" title="Save"><Check size={14} /></button>
+                                        <button onClick={() => { setEditingLayerId(null); setEditingName(''); }} className="p-1 text-slate-400" title="Cancel"><X size={14} /></button>
+                                    </div>
+                                ) : (
+                                    <button onClick={() => setActiveLayerId(layer.id)} onDoubleClick={() => { setEditingLayerId(layer.id); setEditingName(layer.name); }} className={`flex-1 min-w-0 text-sm text-left truncate ${activeLayerId===layer.id? (isDark ? 'text-white' : 'text-blue-600 font-bold') : textSecondary}`}>
+                                        <span className="truncate">{layer.name}</span>
+                                    </button>
+                                )}
                                 {layer.lattice && (
-                                    <button onClick={() => setLattice(layer.lattice, layer.id)} className={`text-[10px] ml-2 px-2 py-0.5 rounded ${isDark ? 'bg-slate-700 text-slate-200' : 'bg-slate-200 text-slate-700'}`}>{t('Use Lattice')}</button>
+                                    // Hide the button visually while editing the name, but keep the space (invisible) so layout doesn't change
+                                    <button onClick={() => setLattice(layer.lattice, layer.id)} className={`text-[10px] ml-2 px-2 py-0.5 rounded ${isDark ? 'bg-slate-700 text-slate-200' : 'bg-slate-200 text-slate-700'} ${editingLayerId === layer.id ? 'invisible' : ''}`}>{t('Use Lattice')}</button>
                                 )}
                             </div>
                             <div className="flex items-center gap-2">
@@ -216,7 +288,8 @@ const LeftPanel = () => {
                                         }
                                         return next;
                                     });
-                                }} className="p-1 text-slate-400 hover:text-red-400" title={t('Delete Layer')}><Trash size={14}/></button>
+                                }} className={`p-1 text-slate-400 hover:text-red-400 ${editingLayerId === layer.id ? 'invisible' : ''}`} title={t('Delete Layer')}><Trash size={14}/></button>
+                                {/* Rename by double-clicking the layer name */}
                             </div>
                         </div>
                     ))}
