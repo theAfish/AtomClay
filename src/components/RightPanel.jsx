@@ -1,16 +1,21 @@
-import React from 'react';
-import { Scissors, MousePointer2, Trash2, Move, RotateCw, Maximize2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { Scissors, MousePointer2, Trash2, Move, RotateCw, Maximize2, Layers, Eye, EyeOff, Plus, Trash, Check, X } from 'lucide-react';
 import { ELEMENT_DATA } from '../constants/elements';
+import { useTranslation } from 'react-i18next';
 import { useMolecularContext } from '../context/MolecularContext';
 
 const RightPanel = () => {
+    const { t } = useTranslation();
+
     const {
         atoms, selectedAtomIds, setSelectedAtomIds,
         editMode, setEditMode,
         targetElement, setTargetElement,
         transformMode, setTransformMode,
         updateAtoms,
-        theme
+        theme,
+        // Layers-related state moved from LeftPanel
+        layers, setLayers, activeLayerId, setActiveLayerId, setLattice, renameLayer, lattice
     } = useMolecularContext();
 
     const selectedCount = selectedAtomIds.length;
@@ -39,9 +44,13 @@ const RightPanel = () => {
         }
     };
 
+    // Local editing state for layers moved into this panel
+    const [editingLayerId, setEditingLayerId] = useState(null);
+    const [editingName, setEditingName] = useState('');
+
     return (
-        <div className="absolute top-4 right-4 w-64 pointer-events-none">
-            <div className={`${panelClass} p-4 rounded-xl shadow-xl pointer-events-auto`}>
+        <div className="absolute top-4 right-4 w-80 pointer-events-none">
+            <div className={`${panelClass} p-4 rounded-xl shadow-xl pointer-events-auto`}> 
                 <h2 className={`text-sm font-bold mb-3 flex items-center gap-2 ${textPrimary}`}>
                     <Scissors size={16} /> 编辑工具
                 </h2>
@@ -107,6 +116,70 @@ const RightPanel = () => {
                         {editMode==='SELECT' ? `点击原子进行选择或拖拽 (${transformMode})` : '点击原子进行删除'}
                     </div>
                 )}
+            </div>
+
+            {/* Layers UI moved here from LeftPanel */}
+            <div className={`${panelClass} p-4 rounded-xl shadow-xl pointer-events-auto mt-4`}>
+                <h2 className={`text-sm font-bold mb-3 flex items-center gap-2 ${textPrimary}`}>
+                    <Layers size={16} /> {t('Layers')}
+                </h2>
+                <div className="space-y-2">
+                    {layers && layers.map(layer => (
+                        <div key={layer.id} className={`flex items-center justify-between p-2 rounded h-10 ${activeLayerId===layer.id? (isDark ? 'bg-slate-800 border border-slate-600' : 'bg-slate-100 border border-slate-300') : (isDark ? 'bg-slate-900/40' : 'bg-slate-50/50')}`}>
+                            <div className="flex-1 min-w-0 flex items-center gap-2">
+                                <button onClick={() => setLayers(prev => prev.map(l => l.id===layer.id? {...l, visible: !l.visible}: l))} className={`p-1 ${textPrimary}`}>
+                                    {layer.visible ? <Eye size={16} /> : <EyeOff size={16} />}
+                                </button>
+                                {editingLayerId === layer.id ? (
+                                    <div className="flex items-center gap-2 h-full">
+                                        <input autoFocus type="text" value={editingName} onChange={e=>{ setEditingName(e.target.value); }} onKeyDown={e=>{
+                                            if(e.key === 'Enter') { renameLayer(layer.id, editingName || layer.name); setEditingLayerId(null); setEditingName(''); }
+                                            if(e.key === 'Escape') { setEditingLayerId(null); setEditingName(''); }
+                                        }} className={`flex-1 min-w-0 max-w-[240px] h-6 leading-tight text-sm ${bgInput} border ${borderClass} rounded px-2 ${textPrimary}`} />
+                                        <button onClick={() => { renameLayer(layer.id, editingName || layer.name); setEditingLayerId(null); setEditingName(''); }} className="p-1 text-green-400 w-6 h-6 inline-flex items-center justify-center relative z-10" title="Save"><Check size={14} /></button>
+                                        <button onClick={() => { setEditingLayerId(null); setEditingName(''); }} className="p-1 text-slate-400 w-6 h-6 inline-flex items-center justify-center relative z-10" title="Cancel"><X size={14} /></button>
+                                    </div>
+                                ) : (
+                                    <button onClick={() => setActiveLayerId(layer.id)} onDoubleClick={() => { setEditingLayerId(layer.id); setEditingName(layer.name); }} className={`flex-1 min-w-0 text-sm text-left truncate ${activeLayerId===layer.id? (isDark ? 'text-white' : 'text-blue-600 font-bold') : textSecondary}`}>
+                                        <span className="truncate">{layer.name}</span>
+                                    </button>
+                                )}
+                                {layer.lattice && (
+                                    <button onClick={() => setLattice(layer.lattice, layer.id)} className={`text-[10px] ml-2 px-2 py-0.5 rounded ${isDark ? 'bg-slate-700 text-slate-200' : 'bg-slate-200 text-slate-700'} ${editingLayerId === layer.id ? 'invisible pointer-events-none' : ''}`}>{`Use Lattice`}</button>
+                                )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button onClick={() => {
+                                    if (!layers || layers.length <= 1) return;
+                                    setLayers(prev => {
+                                        const next = prev.filter(l => l.id !== layer.id);
+                                        if (activeLayerId === layer.id) {
+                                            const newFirst = next[0] || null;
+                                            if (newFirst) {
+                                                setActiveLayerId(newFirst.id);
+                                                setLattice(newFirst.lattice || null);
+                                            } else {
+                                                setActiveLayerId(null);
+                                                setLattice(null);
+                                            }
+                                        }
+                                        return next;
+                                    });
+                                }} className={`p-1 text-slate-400 hover:text-red-400 ${editingLayerId === layer.id ? 'invisible pointer-events-none' : ''}`} title={`Delete Layer`}><Trash size={14}/></button>
+                            </div>
+                        </div>
+                    ))}
+
+                    <div className="pt-2">
+                        <button onClick={() => {
+                            const id = `layer-${Date.now()}`;
+                            const name = `Layer ${layers.length + 1}`;
+                            const newLayer = { id, name, visible: true, opacity: 1, lattice: lattice ? JSON.parse(JSON.stringify(lattice)) : null };
+                            setLayers(prev => [newLayer, ...prev]);
+                            setActiveLayerId(id);
+                        }} className="w-full bg-blue-600 hover:bg-blue-500 text-white py-1 rounded text-xs flex items-center justify-center gap-2"><Plus size={14}/> {`New Layer`}</button>
+                    </div>
+                </div>
             </div>
         </div>
     );

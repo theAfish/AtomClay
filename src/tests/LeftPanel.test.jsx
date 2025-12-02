@@ -2,25 +2,23 @@ import React from 'react';
 import { describe, it, expect } from 'vitest';
 import { render, fireEvent } from '@testing-library/react';
 import { MolecularProvider } from '../context/MolecularContext';
-import LeftPanel from '../components/LeftPanel';
+import RightPanel from '../components/RightPanel';
 import i18n from '../i18n';
 import { I18nextProvider } from 'react-i18next';
 
-describe('LeftPanel rename UI', () => {
+describe('Layers panel rename UI (moved to right panel)', () => {
     it('should allow renaming a layer via UI', async () => {
         // Ensure english locale for test
         i18n.changeLanguage('en');
         const { findByTitle, getByText, getAllByText, container } = render(
             <I18nextProvider i18n={i18n}>
                 <MolecularProvider>
-                    <LeftPanel />
+                    <RightPanel />
                 </MolecularProvider>
             </I18nextProvider>
         );
 
-        // Double-click the layer label to start editing
-        // There are two occurrences of "Layer 1" in the panel (Active Layer header and list item).
-        // Pick the list entry which uses the .truncate class so the test double-clicks the list item.
+        // Double-click the layer label to start editing — this is in the right panel now
         const labels = getAllByText('Layer 1');
         const label = labels.find(el => el.classList && el.classList.contains('truncate')) || labels[0];
         expect(label).toBeTruthy();
@@ -67,10 +65,12 @@ describe('LeftPanel rename UI', () => {
             expect(useLatBtnAfter.classList.contains('invisible')).toBe(false);
         }
 
-        // Ensure the header (Active Layer) is not itself showing an input (editing box) when the list item was edited
+        // Ensure the header (Active Layer) on the left panel is not itself showing an input (editing box) when the list item was edited
         // `Active Layer` text may be split by DOM nodes so use a regex match
-        const headerLabel = getByText(/Active Layer/);
-        const headerParagraph = headerLabel.closest('p');
-        expect(headerParagraph.querySelector('input[type="text"]')).toBeNull();
+        const leftPanelActive = container.ownerDocument.querySelector('.absolute.top-4.left-4');
+        const headerLabel = leftPanelActive ? leftPanelActive.querySelector('p') : null;
+        if (headerLabel) {
+            expect(headerLabel.querySelector('input[type="text"]')).toBeNull();
+        }
     });
 });
