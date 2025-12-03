@@ -2,17 +2,20 @@
 @tailwind components;
 @tailwind utilities;
 
-body { margin: 0; overflow: hidden; @apply bg-slate-900 text-white; }
+/* Body background updated to a richer navy rather than flat gray */
+body { margin: 0; overflow: hidden; background: #0b1220; @apply text-white; }
 #root { width: 100vw; height: 100vh; }
 canvas { display: block; outline: none; }
 ::-webkit-scrollbar { width: 8px; height: 8px; }
-::-webkit-scrollbar-track { @apply bg-slate-800; }
-::-webkit-scrollbar-thumb { @apply bg-slate-600; border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { @apply bg-slate-500; }
+::-webkit-scrollbar-track { background: #0b1220; }
+::-webkit-scrollbar-thumb { background: #243544; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #2d4a5b; }
 .glass-panel {
-    background: rgba(30, 41, 59, 0.9);
+    /* Slightly lighter than the page background, with a more visible border and soft shadow */
+    background: rgba(22, 32, 46, 0.9);
     backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    box-shadow: 0 8px 24px rgba(2, 6, 23, 0.6), 0 1px 0 rgba(255, 255, 255, 0.02);
 }
 input[type="number"] { -moz-appearance: textfield; }
 input[type="number"]::-webkit-inner-spin-button, 

@@ -32,6 +32,7 @@ export const MolecularProvider = ({ children }) => {
         handleSupercell: handleSupercellOp,
         handleVacuum: handleVacuumOp,
         handleScaleLattice: handleScaleLatticeOp,
+        handleSetLattice: handleSetLatticeOp,
         addAtoms,
         updateAtoms
         , renameLayer
@@ -213,6 +214,14 @@ export const MolecularProvider = ({ children }) => {
         }
     };
 
+    const handleSetLattice = (newLat) => {
+        try {
+            handleSetLatticeOp(newLat);
+        } catch (e) {
+            alert(e.message);
+        }
+    };
+
     const onAtomClick = useCallback((id, isMulti) => {
         if(editMode === 'DELETE' && id !== null) {
             updateAtoms(prev => prev.filter(a => a.id !== id));
@@ -303,6 +312,7 @@ export const MolecularProvider = ({ children }) => {
         handleSupercell,
         handleVacuum,
         handleScaleLattice,
+        handleSetLattice,
         onAtomClick,
         onBoxSelect,
         onAtomsMoveEnd,

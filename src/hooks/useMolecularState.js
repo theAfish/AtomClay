@@ -120,6 +120,21 @@ export function useMolecularState() {
         // setAtoms([...otherAtoms, ...newAtoms]);
     }, [atoms, lattice, layers, activeLayerId, saveStateToHistory, currentLatticeSourceId]);
 
+    const handleSetLattice = useCallback((newLattice) => {
+        const currentLatticeVal = lattice;
+        if (!currentLatticeVal || !newLattice) return;
+
+        // Validate newLattice shape
+        if (!Array.isArray(newLattice) || newLattice.length !== 3 || !Array.isArray(newLattice[0])) {
+            throw new Error('Invalid lattice matrix');
+        }
+
+        // Atoms remain unchanged in Cartesian coordinates when replacing lattice matrix
+        saveStateToHistory(atoms, lattice, layers, activeLayerId, currentLatticeSourceId);
+        setLayers(prev => prev.map(l => l.id === activeLayerId ? { ...l, lattice: newLattice } : l));
+        setCurrentLattice(newLattice);
+    }, [atoms, lattice, layers, activeLayerId, saveStateToHistory, currentLatticeSourceId]);
+
     const addAtoms = useCallback((newAtoms, newLat, createNewLayer = false) => {
         let targetLayerId = activeLayerId;
         const isFirstImport = atoms.length === 0;
@@ -191,6 +206,7 @@ export function useMolecularState() {
         handleSupercell,
         handleVacuum,
         handleScaleLattice,
+        handleSetLattice,
         addAtoms,
         updateAtoms,
         renameLayer,

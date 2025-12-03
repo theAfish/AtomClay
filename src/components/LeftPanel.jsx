@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Box, Layers, Upload, Download, Grid, ChevronDown, Expand, Eye, EyeOff, Plus, Trash, Check, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useMolecularContext } from '../context/MolecularContext';
+import { PANEL_CLASSES } from '../constants/theme';
 import { MathUtils } from '../utils/math';
 import { StructureInfo } from '../utils/structureInfo';
 
@@ -11,7 +12,7 @@ const LeftPanel = () => {
         atoms, lattice, 
         handleLoad, handleDownload, 
         handleSupercell, handleVacuum,
-        handleScaleLattice,
+        handleScaleLattice, handleSetLattice,
         layers, setLayers, activeLayerId, setActiveLayerId, setLattice,
         theme,
         renameLayer,
@@ -43,14 +44,14 @@ const LeftPanel = () => {
     const [scMatrix, setScMatrix] = useState([[1,1,0],[-1,1,0],[0,0,1]]);
     const [vacuum, setVacuum] = useState(15.0);
     const [scaleVec, setScaleVec] = useState([1,1,1]);
-    const [lenVec, setLenVec] = useState([0,0,0]);
+    const [setMat, setSetMat] = useState([[0,0,0],[0,0,0],[0,0,0]]);
 
     useEffect(()=>{
         if(lattice && lattice[0]){
-            setLenVec([
-                Math.sqrt(lattice[0][0]**2 + lattice[0][1]**2 + lattice[0][2]**2),
-                Math.sqrt(lattice[1][0]**2 + lattice[1][1]**2 + lattice[1][2]**2),
-                Math.sqrt(lattice[2][0]**2 + lattice[2][1]**2 + lattice[2][2]**2),
+            setSetMat([
+                [lattice[0][0], lattice[0][1], lattice[0][2]],
+                [lattice[1][0], lattice[1][1], lattice[1][2]],
+                [lattice[2][0], lattice[2][1], lattice[2][2]],
             ]);
         }
     }, [lattice]);
@@ -65,23 +66,33 @@ const LeftPanel = () => {
     const [editingName, setEditingName] = useState('');
 
     const isDark = theme === 'dark';
-    const panelClass = isDark ? "glass-panel" : "bg-white/90 backdrop-blur-xl border border-slate-200";
-    const textPrimary = isDark ? "text-slate-200" : "text-slate-800";
-    const textSecondary = isDark ? "text-slate-300" : "text-slate-600";
-    const textMuted = isDark ? "text-slate-400" : "text-slate-500";
-    const bgInput = isDark ? "bg-slate-800" : "bg-slate-100";
-    const bgInputDarker = isDark ? "bg-slate-900" : "bg-slate-200";
-    const borderClass = isDark ? "border-slate-700" : "border-slate-300";
-    const buttonSecondary = isDark ? "bg-slate-700 hover:bg-slate-600 text-white" : "bg-slate-200 hover:bg-slate-300 text-slate-800";
+    const panels = PANEL_CLASSES[theme] || PANEL_CLASSES.dark;
+    const panelClass = panels.panelClass;
+    const textPrimary = panels.textPrimary;
+    const textSecondary = panels.textSecondary;
+    const textMuted = panels.textMuted;
+    const bgInput = panels.bgInput;
+    const bgInputDarker = panels.bgInputDarker;
+    const borderClass = panels.borderClass;
+    const buttonSecondary = panels.buttonSecondary;
+    const buttonPrimary = panels.buttonPrimary;
+    const textTitle = panels.textTitle;
+    const textIcon = panels.textIcon;
+    const textLayerInfo = panels.textLayerInfo;
+    const textNoLattice = panels.textNoLattice;
+    const buttonPreset = panels.buttonPreset;
+    const layerTextActive = panels.layerTextActive;
+    const layerTextMuted = panels.layerTextMuted;
+    const layerTextAccent = panels.layerTextAccent;
 
     return (
         <div className="absolute top-4 left-4 w-80 flex flex-col gap-4 pointer-events-none">
             <div className={`${panelClass} p-4 rounded-xl shadow-xl pointer-events-auto`}>
-                <h1 className={`text-xl font-bold mb-2 flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                    <Box className="text-blue-400" /> AtomClay
+                <h1 className={`text-xl font-bold mb-2 flex items-center gap-2 ${textTitle}`}>
+                    <Box className={`${textIcon}`} /> AtomClay
                 </h1>
                 <div className="flex gap-2 mb-4">
-                    <label className="flex-1 cursor-pointer bg-blue-600 hover:bg-blue-500 text-white py-2 px-3 rounded-lg flex items-center justify-center gap-2 text-sm transition">
+                    <label className={`flex-1 cursor-pointer ${buttonPrimary} py-2 px-3 rounded-lg flex items-center justify-center gap-2 text-sm transition`}>
                         <Upload size={16} /> {t('Load Molecule')}
                         <input type="file" className="hidden" onChange={handleLoad} />
                     </label>
@@ -89,7 +100,7 @@ const LeftPanel = () => {
                         <Download size={18} />
                     </button>
                 </div>
-                <div className={`text-xs font-mono p-2 rounded border ${isDark ? 'bg-slate-800 text-slate-300 border-slate-700' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>
+                <div className={`text-xs font-mono p-2 rounded border ${panels.bgCard} ${textSecondary} ${borderClass}`}>
                     <p className="font-bold">{t('Active Layer')}: {activeLayer ? (
                         <span className="inline-flex items-center gap-2">
                             {editingActiveLayerId === activeLayer.id ? (
@@ -98,8 +109,8 @@ const LeftPanel = () => {
                                         if(e.key === 'Enter') { renameLayer(activeLayer.id, editingActiveName || activeLayer.name); setEditingActiveLayerId(null); setEditingActiveName(''); }
                                         if(e.key === 'Escape') { setEditingActiveLayerId(null); setEditingActiveName(''); }
                                     }} className={`flex-1 min-w-0 max-w-[200px] h-6 leading-tight text-sm ${bgInput} border ${borderClass} rounded px-2 ${textPrimary}`} />
-                                    <button onClick={() => { renameLayer(activeLayer.id, editingActiveName || activeLayer.name); setEditingActiveLayerId(null); setEditingActiveName(''); }} className="p-1 text-green-400" title="Save"><Check size={14} /></button>
-                                    <button onClick={() => { setEditingActiveLayerId(null); setEditingActiveName(''); }} className="p-1 text-slate-400" title="Cancel"><X size={14} /></button>
+                                    <button onClick={() => { renameLayer(activeLayer.id, editingActiveName || activeLayer.name); setEditingActiveLayerId(null); setEditingActiveName(''); }} className={`p-1 ${layerTextAccent}`} title="Save"><Check size={14} /></button>
+                                    <button onClick={() => { setEditingActiveLayerId(null); setEditingActiveName(''); }} className={`p-1 ${layerTextMuted}`} title="Cancel"><X size={14} /></button>
                                 </span>
                             ) : (
                                 <span className="inline-flex items-center gap-2">
@@ -117,10 +128,10 @@ const LeftPanel = () => {
                                 <div>a: ({latticeToShow[0].map(v => v.toFixed(3)).join(', ')}) — {latticeLens[0].toFixed(3)} Å</div>
                                 <div>b: ({latticeToShow[1].map(v => v.toFixed(3)).join(', ')}) — {latticeLens[1].toFixed(3)} Å</div>
                                 <div>c: ({latticeToShow[2].map(v => v.toFixed(3)).join(', ')}) — {latticeLens[2].toFixed(3)} Å</div>
-                                <div className="text-slate-400 mt-1">{t('Cell Volume')}: {volume !== null ? `${volume.toFixed(3)} Å³` : 'N/A'}</div>
+                                <div className={`${textNoLattice} mt-1`}>{t('Cell Volume')}: {volume !== null ? `${volume.toFixed(3)} Å³` : 'N/A'}</div>
                             </div>
                         ) : (
-                            <div className="text-[11px] text-slate-400">{t('No lattice information')}</div>
+                            <div className={`text-[11px] ${textNoLattice}`}>{t('No lattice information')}</div>
                         )}
                     </div>
                 </div>
@@ -132,7 +143,7 @@ const LeftPanel = () => {
                 </h2>
                 <div className="space-y-3">
                     {/* Supercell */}
-                    <div className={`${isDark ? 'bg-slate-900/50' : 'bg-slate-50'} p-2 rounded border ${borderClass}`}>
+                    <div className={`${panels.bgCard} p-2 rounded border ${borderClass}`}>
                         <button onClick={() => setExpand(!expand)} className={`w-full flex justify-between text-sm ${textSecondary} hover:${textPrimary}`}>
                             <span className="flex items-center gap-2"><Grid size={16} /> {t('Supercell')}</span>
                             <ChevronDown size={14} className={`transition ${expand?'rotate-180':''}`} />
@@ -140,8 +151,8 @@ const LeftPanel = () => {
                         {expand && (
                             <div className="mt-3 space-y-3">
                                 <div className={`flex gap-2 text-xs border-b ${borderClass} pb-2`}>
-                                    <button onClick={()=>setScMode('diag')} className={`flex-1 py-1 rounded ${scMode==='diag'?'bg-blue-600 text-white':textMuted}`}>{t('Diagonal')}</button>
-                                    <button onClick={()=>setScMode('matrix')} className={`flex-1 py-1 rounded ${scMode==='matrix'?'bg-blue-600 text-white':textMuted}`}>{t('Matrix')}</button>
+                                    <button onClick={()=>setScMode('diag')} className={`flex-1 py-1 rounded ${scMode==='diag'?buttonPrimary:textMuted}`}>{t('Diagonal')}</button>
+                                    <button onClick={()=>setScMode('matrix')} className={`flex-1 py-1 rounded ${scMode==='matrix'?buttonPrimary:textMuted}`}>{t('Matrix')}</button>
                                 </div>
                                 {scMode==='diag' ? (
                                     <div className="flex gap-2 justify-between">
@@ -150,20 +161,20 @@ const LeftPanel = () => {
                                 ) : (
                                     <div className="space-y-2">
                                         <div className="flex gap-2 overflow-x-auto pb-1">
-                                            <button onClick={()=>setScMatrix([[1,1,0],[-1,1,0],[0,0,1]])} className={`text-[10px] px-2 py-1 ${isDark ? 'bg-slate-700' : 'bg-slate-200'} rounded ${textPrimary}`}>√2x√2</button>
-                                            <button onClick={()=>setScMatrix([[2,1,0],[-1,1,0],[0,0,1]])} className={`text-[10px] px-2 py-1 ${isDark ? 'bg-slate-700' : 'bg-slate-200'} rounded ${textPrimary}`}>√3x√3</button>
+                                            <button onClick={()=>setScMatrix([[1,1,0],[-1,1,0],[0,0,1]])} className={`text-[10px] px-2 py-1 ${buttonPreset} rounded ${textPrimary}`}>√2x√2</button>
+                                            <button onClick={()=>setScMatrix([[2,1,0],[-1,1,0],[0,0,1]])} className={`text-[10px] px-2 py-1 ${buttonPreset} rounded ${textPrimary}`}>√3x√3</button>
                                         </div>
                                         <div className="grid grid-cols-3 gap-1">
                                             {scMatrix.map((r,ri)=>r.map((v,ci)=><input key={`${ri}${ci}`} type="number" value={v} onChange={e=>{const m=scMatrix.map(row=>[...row]);m[ri][ci]=+e.target.value;setScMatrix(m)}} className={`w-full ${bgInput} border ${borderClass} rounded text-center text-xs py-1 ${textPrimary}`}/>))}
                                         </div>
                                     </div>
                                 )}
-                                <button onClick={()=>handleSupercell(scMode, scDiag, scMatrix)} className="w-full bg-blue-600 hover:bg-blue-500 text-white py-1 rounded text-xs font-bold">{t('Apply')}</button>
+                                <button onClick={()=>handleSupercell(scMode, scDiag, scMatrix)} className={`w-full ${buttonPrimary} py-1 rounded text-xs font-bold`}>{t('Apply')}</button>
                             </div>
                         )}
                     </div>
                     {/* Lattice Operations Accordion */}
-                    <div className={`${isDark ? 'bg-slate-900/50' : 'bg-slate-50'} p-2 rounded border ${borderClass}`}>
+                    <div className={`${panels.bgCard} p-2 rounded border ${borderClass}`}>
                         <button onClick={() => setExpandLattice(!expandLattice)} className={`w-full flex justify-between text-sm ${textSecondary} hover:${textPrimary}`}>
                             <span className="flex items-center gap-2"><Expand size={16} /> {t('Lattice Operations')}</span>
                             <ChevronDown size={14} className={`transition ${expandLattice?'rotate-180':''}`} />
@@ -171,9 +182,9 @@ const LeftPanel = () => {
                         {expandLattice && (
                             <div className="mt-3 space-y-3">
                                 <div className={`flex gap-2 text-xs border-b ${borderClass} pb-2`}>
-                                    <button onClick={()=>setLatticeTab('vacuum')} className={`flex-1 py-1 rounded ${latticeTab==='vacuum'?'bg-blue-600 text-white':textMuted}`}>{t('Vacuum')}</button>
-                                    <button onClick={()=>setLatticeTab('scale')} className={`flex-1 py-1 rounded ${latticeTab==='scale'?'bg-blue-600 text-white':textMuted}`}>{t('Scale')}</button>
-                                    <button onClick={()=>setLatticeTab('setlength')} className={`flex-1 py-1 rounded ${latticeTab==='setlength'?'bg-blue-600 text-white':textMuted}`}>{t('Set Lengths')}</button>
+                                    <button onClick={()=>setLatticeTab('vacuum')} className={`flex-1 py-1 rounded ${latticeTab==='vacuum'?buttonPrimary:textMuted}`}>{t('Vacuum')}</button>
+                                    <button onClick={()=>setLatticeTab('scale')} className={`flex-1 py-1 rounded ${latticeTab==='scale'?buttonPrimary:textMuted}`}>{t('Scale')}</button>
+                                    <button onClick={()=>setLatticeTab('setlength')} className={`flex-1 py-1 rounded ${latticeTab==='setlength'?buttonPrimary:textMuted}`}>{t('Set Lengths')}</button>
                                 </div>
 
                                 {latticeTab === 'vacuum' && (
@@ -205,31 +216,24 @@ const LeftPanel = () => {
                                             ))}
                                         </div>
                                         <button onClick={()=>{ handleScaleLattice(scaleVec[0]||1, scaleVec[1]||1, scaleVec[2]||1); setScaleVec([1,1,1]); }} className={`w-full ${buttonSecondary} p-1 rounded text-xs font-bold`}>{t('Apply')}</button>
-                                        <div className="text-[10px] mt-1 text-slate-400">Scale factors applied to the lattice vectors a, b and c respectively. Atom coordinates remain unchanged.</div>
+                                        <div className={`text-[10px] mt-1 ${textMuted}`}>Scale factors applied to the lattice vectors a, b and c respectively. Atom coordinates remain unchanged.</div>
                                     </div>
                                 )}
 
                                 {latticeTab === 'setlength' && (
                                     <div className="space-y-2">
-                                        <label className={`text-xs ${textMuted} block mb-1`}>{t('Set Lattice Lengths (Å) — keep atoms fixed')}</label>
-                                        <div className="flex gap-2">
-                                            {[0,1,2].map(i=>(
-                                                <input key={i} type="number" step="0.01" value={lenVec[i]} onChange={e=>{const n=[...lenVec];n[i]=+e.target.value;setLenVec(n)}} className={`w-full ${bgInputDarker} border ${borderClass} rounded px-2 py-1 text-sm ${textPrimary}`}/>
-                                            ))}
+                                        <label className={`text-xs ${textMuted} block mb-1`}>{t('Set Lattice Matrix (rows = a,b,c) — keep atoms fixed')}</label>
+                                        <div className="grid grid-cols-3 gap-1">
+                                            {setMat.map((r,ri)=>r.map((v,ci)=>(
+                                                <input key={`${ri}${ci}`} type="number" step="0.0001" value={v} onChange={e=>{const m=setMat.map(row=>[...row]);m[ri][ci]=+e.target.value;setSetMat(m)}} className={`w-full ${bgInputDarker} border ${borderClass} rounded text-center text-xs py-1 ${textPrimary}`}/>
+                                            )))}
                                         </div>
                                         <button onClick={()=>{
-                                            if(!lattice) return;
-                                            const curLens = [
-                                                Math.sqrt(lattice[0][0]**2 + lattice[0][1]**2 + lattice[0][2]**2),
-                                                Math.sqrt(lattice[1][0]**2 + lattice[1][1]**2 + lattice[1][2]**2),
-                                                Math.sqrt(lattice[2][0]**2 + lattice[2][1]**2 + lattice[2][2]**2),
-                                            ];
-                                            const sx = (lenVec[0] && curLens[0]>0) ? (lenVec[0]/curLens[0]) : 1;
-                                            const sy = (lenVec[1] && curLens[1]>0) ? (lenVec[1]/curLens[1]) : 1;
-                                            const sz = (lenVec[2] && curLens[2]>0) ? (lenVec[2]/curLens[2]) : 1;
-                                            handleScaleLattice(sx, sy, sz);
+                                            // ensure matrix numbers
+                                            const newLat = setMat.map(r=>r.map(v=>+v));
+                                            handleSetLattice(newLat);
                                         }} className={`w-full ${buttonSecondary} p-1 rounded text-xs font-bold`}>{t('Apply')}</button>
-                                        <div className="text-[10px] mt-1 text-slate-400">Sets the lattice vector lengths (magnitudes) of a, b and c. The direction of each vector is preserved; atoms remain at the same Cartesian coords.</div>
+                                        <div className={`text-[10px] mt-1 ${textMuted}`}>Sets the full 3x3 lattice matrix (a, b, c as row vectors). Atom Cartesian coordinates remain unchanged.</div>
                                     </div>
                                 )}
                             </div>
