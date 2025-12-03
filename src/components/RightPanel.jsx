@@ -52,14 +52,14 @@ const RightPanel = () => {
         <div className="absolute top-4 right-4 w-80 pointer-events-none">
             <div className={`${panelClass} p-4 rounded-xl shadow-xl pointer-events-auto`}> 
                 <h2 className={`text-sm font-bold mb-3 flex items-center gap-2 ${textPrimary}`}>
-                    <Scissors size={16} /> 编辑工具
+                    <Scissors size={16} /> {t('Edit Tools')}
                 </h2>
                 <div className={`flex gap-1 mb-4 p-1 rounded ${isDark ? 'bg-slate-900/50' : 'bg-slate-200/50'}`}>
                     <button onClick={()=>setEditMode('SELECT')} className={`flex-1 py-2 rounded text-xs flex flex-col items-center gap-1 ${editMode==='SELECT'?'bg-blue-600 text-white':textMuted}`}>
-                        <MousePointer2 size={14} /> 选择/移动
+                        <MousePointer2 size={14} /> {t('Select/Move')}
                     </button>
                     <button onClick={()=>setEditMode('DELETE')} className={`flex-1 py-2 rounded text-xs flex flex-col items-center gap-1 ${editMode==='DELETE'?'bg-red-600 text-white':textMuted}`}>
-                        <Trash2 size={14} /> 删除模式
+                        <Trash2 size={14} /> {t('Delete Mode')}
                     </button>
                 </div>
 
@@ -67,13 +67,13 @@ const RightPanel = () => {
                 {editMode === 'SELECT' && (
                     <div className={`flex gap-1 mb-4 p-1 rounded ${isDark ? 'bg-slate-900/50' : 'bg-slate-200/50'}`}>
                         <button onClick={()=>setTransformMode('translate')} className={`flex-1 py-2 rounded text-xs flex flex-col items-center gap-1 ${transformMode==='translate'?'bg-blue-600 text-white':textMuted}`}>
-                            <Move size={14} /> 平移
+                            <Move size={14} /> {t('Translate')}
                         </button>
                         <button onClick={()=>setTransformMode('rotate')} className={`flex-1 py-2 rounded text-xs flex flex-col items-center gap-1 ${transformMode==='rotate'?'bg-blue-600 text-white':textMuted}`}>
-                            <RotateCw size={14} /> 旋转
+                            <RotateCw size={14} /> {t('Rotate')}
                         </button>
                         <button onClick={()=>setTransformMode('scale')} className={`flex-1 py-2 rounded text-xs flex flex-col items-center gap-1 ${transformMode==='scale'?'bg-blue-600 text-white':textMuted}`}>
-                            <Maximize2 size={14} /> 缩放
+                            <Maximize2 size={14} /> {t('Scale')}
                         </button>
                     </div>
                 )}
@@ -83,37 +83,37 @@ const RightPanel = () => {
                         {selectedCount === 1 && selAtom ? (
                             <>
                                 <div className={`text-xs font-bold mb-2 flex justify-between ${isDark ? 'text-blue-300' : 'text-blue-600'}`}>
-                                    <span>ID: {selAtom.id}</span>
+                                    <span>{t('ID')}: {selAtom.id}</span>
                                     <span>{selAtom.element}</span>
                                 </div>
                                 <div className={`grid grid-cols-3 gap-1 text-[10px] font-mono mb-3 ${textSecondary}`}>
-                                    <div className={`${bgMetric} p-1 rounded text-center`}>x:{selAtom.x.toFixed(2)}</div>
-                                    <div className={`${bgMetric} p-1 rounded text-center`}>y:{selAtom.y.toFixed(2)}</div>
-                                    <div className={`${bgMetric} p-1 rounded text-center`}>z:{selAtom.z.toFixed(2)}</div>
+                                    <div className={`${bgMetric} p-1 rounded text-center`}>{t('x')}: {selAtom.x.toFixed(2)}</div>
+                                    <div className={`${bgMetric} p-1 rounded text-center`}>{t('y')}: {selAtom.y.toFixed(2)}</div>
+                                    <div className={`${bgMetric} p-1 rounded text-center`}>{t('z')}: {selAtom.z.toFixed(2)}</div>
                                 </div>
                             </>
                         ) : (
                             <div className={`text-xs font-bold mb-2 flex justify-between ${isDark ? 'text-blue-300' : 'text-blue-600'}`}>
-                                <span>已选择 {selectedCount} 个原子</span>
+                                <span>{t('Selected Atoms', { count: selectedCount })}</span>
                             </div>
                         )}
                         
                         <div className={`mb-3 border-t ${borderClass} pt-3`}>
-                            <label className={`text-xs ${textMuted} block mb-1`}>替换元素</label>
+                            <label className={`text-xs ${textMuted} block mb-1`}>{t('Replace Element')}</label>
                             <div className="flex gap-2">
                                 <select value={targetElement} onChange={e=>setTargetElement(e.target.value)} className={`flex-1 ${bgInput} border ${isDark ? 'border-slate-600' : 'border-slate-300'} rounded text-xs px-2 py-1 ${textPrimary}`}>
                                     {Object.keys(ELEMENT_DATA).filter(k=>k!=='Default').map(el=><option key={el} value={el}>{el}</option>)}
                                 </select>
-                                <button onClick={onApplyEdit} className="bg-blue-600 hover:bg-blue-500 px-3 rounded text-xs text-white">应用</button>
+                                <button onClick={onApplyEdit} className="bg-blue-600 hover:bg-blue-500 px-3 rounded text-xs text-white">{t('Apply')}</button>
                             </div>
                         </div>
                         <button onClick={onDelete} className="w-full bg-red-500/20 hover:bg-red-500/40 text-red-300 py-1 rounded text-xs flex items-center justify-center gap-1">
-                            <Trash2 size={12} /> 删除
+                            <Trash2 size={12} /> {t('Delete')}
                         </button>
                     </div>
                 ) : (
                     <div className={`text-xs text-center py-4 italic ${textMuted}`}>
-                        {editMode==='SELECT' ? `点击原子进行选择或拖拽 (${transformMode})` : '点击原子进行删除'}
+                        {editMode==='SELECT' ? t('Select Instruction', { mode: t(transformMode.charAt(0).toUpperCase() + transformMode.slice(1)) }) : t('Delete Instruction')}
                     </div>
                 )}
             </div>
