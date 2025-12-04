@@ -20,3 +20,14 @@ canvas { display: block; outline: none; }
 input[type="number"] { -moz-appearance: textfield; }
 input[type="number"]::-webkit-inner-spin-button, 
 input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+
+/* Smooth theme transitions for UI colors.
+     Keep reduced-motion preference respected. This makes background, color,
+     border-color and shadow changes animate when toggling theme. */
+@media (prefers-reduced-motion: no-preference) {
+    body, #root, .glass-panel, button, .lang-dropdown, .rounded-lg, .rounded-full, .absolute, .relative {
+        transition-property: background-color, color, border-color, box-shadow;
+        transition-duration: 250ms;
+        transition-timing-function: ease;
+    }
+}

@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import * as THREE from 'three';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js';
+import { createThreeRenderer, createCustomRenderer } from '../renderers';
 import { getElementProp } from '../constants/elements';
 import { getVdw } from '../constants/atomParams';
 import { COLORS } from '../constants/theme';
@@ -15,10 +14,11 @@ const Viewer = () => {
     const {
         atoms, lattice, layers, activeLayerId,
         selectedAtomIds, onAtomClick, onAtomsMoveEnd, onBoxSelect,
-        transformMode, editMode, theme
+        transformMode, editMode, theme, currentRenderer
     } = useMolecularContext();
 
     const containerRef = useRef(null);
+    const rendererRef = useRef(null);
     const threeRef = useRef({ 
         scene: null, camera: null, renderer: null, 
         controls: null, transformControl: null,
@@ -29,12 +29,15 @@ const Viewer = () => {
         atomInstancedMesh: null,
         instanceIdToAtomId: [],
         atomIdToInstanceId: new Map(),
-        isInstanced: false
+        isInstanced: false,
+        isDragging: false,
+        isBoxSelecting: false,
     });
 
     const latestProps = useRef({ atoms, activeLayerId, theme });
     useEffect(() => {
         latestProps.current = { atoms, activeLayerId, theme };
+        if (rendererRef.current) rendererRef.current._latestProps = latestProps.current;
     }, [atoms, activeLayerId, theme]);
 
     const visibleAtoms = useMemo(() => {
@@ -48,154 +51,43 @@ const Viewer = () => {
     const drawGizmo = useGizmo(containerRef, threeRef, theme, lattice);
     const selectionBox = useBoxSelection(containerRef, threeRef, atoms, activeLayerId, onBoxSelect);
 
-    // Keep a ref to the latest drawGizmo function so the animation loop can call it
+    // Keep a ref to the latest drawGizmo function so the renderer's animate loop can call it
     const drawGizmoRef = useRef(drawGizmo);
     useEffect(() => {
         drawGizmoRef.current = drawGizmo;
+        if (rendererRef.current && rendererRef.current._drawGizmoRef) rendererRef.current._drawGizmoRef.current = drawGizmo;
     }, [drawGizmo]);
 
-    // 初始化 Three.js
+    // Initialize renderer (three-based) and wire up callbacks (re-init when `currentRenderer` changes)
     useEffect(() => {
-        const width = containerRef.current.clientWidth;
-        const height = containerRef.current.clientHeight;
-        
-        const scene = new THREE.Scene();
-        // Ensure scene uses Z as up
-        scene.up.set(0, 0, 1);
-        // Use Z as the global "up" axis instead of the default Y-up
-        if (THREE.Object3D && THREE.Object3D.DefaultUp && THREE.Object3D.DefaultUp.set) {
-            THREE.Object3D.DefaultUp.set(0, 0, 1);
+        if (!containerRef.current) return;
+        // Dispose previous renderer if present
+        if (rendererRef.current) {
+            try { rendererRef.current.dispose(); } catch (e) {}
+            rendererRef.current = null;
         }
-        scene.background = new THREE.Color(COLORS.background.dark);
-        scene.add(new THREE.AmbientLight(COLORS.general.white, DEFAULTS.LIGHTING.AMBIENT_INTENSITY));
-        const dirLight = new THREE.DirectionalLight(COLORS.general.white, DEFAULTS.LIGHTING.DIRECTIONAL_INTENSITY);
-        dirLight.position.set(...DEFAULTS.LIGHTING.DIRECTIONAL_POSITION);
-        scene.add(dirLight);
 
-        const camera = new THREE.PerspectiveCamera(DEFAULTS.CAMERA.FOV, width/height, DEFAULTS.CAMERA.NEAR, DEFAULTS.CAMERA.FAR);
-        // Make camera use Z as up as well
-        camera.up.set(0, 0, 1);
-        camera.position.set(...DEFAULTS.CAMERA.POSITION);
+        const rendererApi = currentRenderer === 'custom' ? createCustomRenderer() : createThreeRenderer();
+        rendererRef.current = rendererApi;
+        rendererApi.init(containerRef.current, { onAtomClick, onAtomsMoveEnd, onBoxSelect, theme, lattice });
 
-        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-        renderer.setSize(width, height);
-        renderer.setPixelRatio(window.devicePixelRatio);
-        containerRef.current.appendChild(renderer.domElement);
+        // Replace our threeRef.current with renderer's internal threeRef object so
+        // existing hooks and logic continue to work.
+        threeRef.current = rendererApi.threeRef;
 
-        const controls = new OrbitControls(camera, renderer.domElement);
-        controls.enableDamping = true;
-        controls.target.set(...DEFAULTS.CAMERA.TARGET);
+        // Provide the drawGizmo function to renderer's animate loop
+        if (rendererApi._drawGizmoRef) rendererApi._drawGizmoRef.current = drawGizmoRef.current;
 
-        // Transform Controls for Dragging
-        const transformControl = new TransformControls(camera, renderer.domElement);
-        transformControl.addEventListener('dragging-changed', (event) => {
-            controls.enabled = !event.value; // 拖拽时禁用视角旋转
-        });
-        scene.add(transformControl);
+        // Forward latestProps for click filtering inside renderer
+        rendererApi._latestProps = latestProps.current;
 
-        threeRef.current = { 
-            scene, camera, renderer, controls, transformControl, 
-            atomMeshes: new Map(),
-            controlAnchor: new THREE.Object3D(),
-            dragStartPos: new THREE.Vector3(),
-            initialAtomPositions: new Map(),
-            isDragging: false,
-            atomInstancedMesh: null,
-            instanceIdToAtomId: [],
-            atomIdToInstanceId: new Map(),
-            isInstanced: false
-        };
-
-        const handleResize = () => {
-            const w = containerRef.current.clientWidth;
-            const h = containerRef.current.clientHeight;
-            camera.aspect = w/h;
-            camera.updateProjectionMatrix();
-            renderer.setSize(w,h);
-        };
-        window.addEventListener('resize', handleResize);
-
-
-
-        const animate = () => {
-            requestAnimationFrame(animate);
-            controls.update();
-            renderer.render(scene, camera);
-            try { 
-                if (drawGizmoRef.current) drawGizmoRef.current(); 
-            } catch (e) {}
-        };
-        animate();
-
-        // Click Handler (Raycasting)
-        const raycaster = new THREE.Raycaster();
-        const mouse = new THREE.Vector2();
-
-        let mouseDownPos = { x: 0, y: 0 };
-        const onMouseDownClickCheck = (e) => {
-            mouseDownPos = { x: e.clientX, y: e.clientY };
-        };
-        renderer.domElement.addEventListener('mousedown', onMouseDownClickCheck);
-        
-        const onClick = (e) => {
-            const dist = Math.sqrt((e.clientX - mouseDownPos.x)**2 + (e.clientY - mouseDownPos.y)**2);
-            if (dist > DEFAULTS.INTERACTION.CLICK_DISTANCE_THRESHOLD) return;
-
-            // 忽略拖拽结束时的点击
-            if (transformControl.dragging || threeRef.current.isDragging) return;
-            // Ignore if box selection just happened
-            if (threeRef.current.isBoxSelecting) return;
-
-            const rect = renderer.domElement.getBoundingClientRect();
-            mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-            mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-            
-            raycaster.setFromCamera(mouse, camera);
-            
-            let intersects = [];
-            if (threeRef.current.isInstanced && threeRef.current.atomInstancedMesh) {
-                intersects = raycaster.intersectObject(threeRef.current.atomInstancedMesh);
-            } else {
-                const meshes = Array.from(threeRef.current.atomMeshes.values());
-                intersects = raycaster.intersectObjects(meshes);
-            }
-            
-            // Filter intersects to only include atoms in active layer
-            const { atoms: currentAtoms, activeLayerId: currentLayerId } = latestProps.current;
-            const activeLayerAtomIds = new Set(currentAtoms.filter(a => a.layerId === currentLayerId).map(a => a.id));
-            
-            const validIntersects = [];
-            for (let hit of intersects) {
-                let atomId;
-                if (threeRef.current.isInstanced) {
-                    atomId = threeRef.current.instanceIdToAtomId[hit.instanceId];
-                } else {
-                    atomId = hit.object.userData.id;
-                }
-                
-                if (activeLayerAtomIds.has(atomId)) {
-                    validIntersects.push(atomId);
-                }
-            }
-
-            if (validIntersects.length > 0) {
-                onAtomClick(validIntersects[0], e.ctrlKey || e.metaKey);
-            } else {
-                onAtomClick(null, e.ctrlKey || e.metaKey); // Deselect or clear
-            }
-        };
-        renderer.domElement.addEventListener('click', onClick);
+        // Sync initial scene to renderer
+        try { if (rendererApi.syncScene) rendererApi.syncScene({ atoms, lattice, layers, activeLayerId, theme }); } catch(e) {}
 
         return () => {
-            window.removeEventListener('resize', handleResize);
-            renderer.domElement.removeEventListener('click', onClick);
-            renderer.domElement.removeEventListener('mousedown', onMouseDownClickCheck);
-            if (containerRef.current) {
-                containerRef.current.innerHTML = '';
-            }
+            try { rendererApi.dispose(); } catch (e) {}
         };
-    }, []); // Run once
-
+    }, [currentRenderer]); // Re-init when renderer changes
 
 
     // 响应 TransformControls 拖拽结束，通知 App 更新坐标
@@ -203,7 +95,6 @@ const Viewer = () => {
         const { transformControl, controlAnchor, atomMeshes, dragStartPos, initialAtomPositions, controls, atomInstancedMesh, isInstanced, atomIdToInstanceId } = threeRef.current;
         // Ensure we have additional tracking for rotation/scale
         if (!threeRef.current.initialAnchorQuaternion) threeRef.current.initialAnchorQuaternion = new THREE.Quaternion();
-        if (!threeRef.current.initialAnchorScale) threeRef.current.initialAnchorScale = new THREE.Vector3(1,1,1);
         if (!threeRef.current.initialAtomPositionsRelative) threeRef.current.initialAtomPositionsRelative = new Map();
         
         const onDragChange = (event) => {
@@ -372,203 +263,63 @@ const Viewer = () => {
     // Update background color based on theme
     useEffect(() => {
         if (threeRef.current.scene) {
-            threeRef.current.scene.background = new THREE.Color(theme === 'dark' ? COLORS.background.dark : COLORS.background.light);
-            // Also update fog or other theme related things if needed
+            const scene = threeRef.current.scene;
+            const targetColor = new THREE.Color(theme === 'dark' ? COLORS.background.dark : COLORS.background.light);
+            // Animate scene background color over ~300ms for a smooth transition
+            const duration = 300; // ms
+            const startTime = performance.now();
+            const startColor = scene.background && scene.background.isColor ? scene.background.clone() : new THREE.Color(targetColor.getHex());
+            let rafId = null;
+
+            const step = (t) => {
+                const elapsed = Math.max(0, t - startTime);
+                const v = Math.min(1, elapsed / duration);
+                const c = startColor.clone().lerp(targetColor, v);
+                scene.background = c;
+                if (v < 1) rafId = requestAnimationFrame(step);
+            };
+
+            rafId = requestAnimationFrame(step);
+
+            return () => {
+                if (rafId) cancelAnimationFrame(rafId);
+            };
         }
     }, [theme]);
 
-    // Sync Scene (Geometry: Atoms, Bonds, Lattice)
+    // Sync scene via renderer API (use renderer-specific logic instead of manual creation)
     useEffect(() => {
-        const { scene, atomMeshes, controlAnchor } = threeRef.current;
-
-        // 1. Clear old objects
-        const toRemove = [];
-        scene.traverse(c => {
-            if(c.userData.type === 'atom' || c.userData.type === 'bond' || c.userData.type === 'box' || c.userData.type === 'atom-instanced') toRemove.push(c);
-        });
-        toRemove.forEach(c => {
-            scene.remove(c);
-            if(c.geometry) c.geometry.dispose();
-        });
-        atomMeshes.clear();
-        threeRef.current.atomInstancedMesh = null;
-        threeRef.current.instanceIdToAtomId = [];
-        threeRef.current.atomIdToInstanceId.clear();
-        
-        if (!scene.children.includes(controlAnchor)) scene.add(controlAnchor);
-
-        // 2. Draw Lattice
-        const hasLattice = Array.isArray(lattice) && lattice.length === 3 && lattice.every(v => Array.isArray(v) && v.length === 3);
-        if (hasLattice) {
-            const boxGeo = new THREE.BufferGeometry();
-            const o=[0,0,0];
-            const [a,b,c] = lattice;
-            const ab=[a[0]+b[0],a[1]+b[1],a[2]+b[2]], ac=[a[0]+c[0],a[1]+c[1],a[2]+c[2]], bc=[b[0]+c[0],b[1]+c[1],b[2]+c[2]];
-            const abc=[ab[0]+c[0],ab[1]+c[1],ab[2]+c[2]];
-            const pts = [];
-            [[o,a],[o,b],[o,c],[a,ab],[a,ac],[b,ab],[b,bc],[c,ac],[c,bc],[ab,abc],[ac,abc],[bc,abc]].forEach(pair=>{
-                pts.push(...pair[0], ...pair[1]);
-            });
-            boxGeo.setAttribute('position', new THREE.Float32BufferAttribute(pts,3));
-            const boxLine = new THREE.LineSegments(boxGeo, new THREE.LineBasicMaterial({color: theme === 'dark' ? COLORS.lattice.dark : COLORS.lattice.light}));
-            boxLine.userData.type='box';
-            scene.add(boxLine);
+        if (rendererRef.current && rendererRef.current.syncScene) {
+            try { rendererRef.current.syncScene({ atoms, lattice, layers, activeLayerId, theme }); } catch (e) {}
         }
+    }, [atoms, lattice, layers, theme, currentRenderer]);
 
-        // 3. Draw Atoms
-        const isLargeSystem = visibleAtoms.length > DEFAULTS.PERFORMANCE.INSTANCED_MESH_THRESHOLD;
-        threeRef.current.isInstanced = isLargeSystem;
-
-        if (isLargeSystem) {
-            const sphereGeo = new THREE.SphereGeometry(1, DEFAULTS.VISUALS.SPHERE_SEGMENTS, DEFAULTS.VISUALS.SPHERE_SEGMENTS);
-            const mat = new THREE.MeshStandardMaterial({
-                roughness: 0.3, metalness: 0.2,
-                color: COLORS.general.white
-            });
-            const instMesh = new THREE.InstancedMesh(sphereGeo, mat, visibleAtoms.length);
-            const dummy = new THREE.Object3D();
-            
-            visibleAtoms.forEach((atom, i) => {
-                const prop = getElementProp(atom.element);
-                dummy.position.set(atom.x, atom.y, atom.z);
-                dummy.scale.setScalar(prop.radius * DEFAULTS.VISUALS.ATOM_SCALE);
-                dummy.updateMatrix();
-                instMesh.setMatrixAt(i, dummy.matrix);
-                instMesh.setColorAt(i, new THREE.Color(prop.color));
-                
-                threeRef.current.instanceIdToAtomId[i] = atom.id;
-                threeRef.current.atomIdToInstanceId.set(atom.id, i);
-            });
-            
-            instMesh.userData = { type: 'atom-instanced' };
-            scene.add(instMesh);
-            threeRef.current.atomInstancedMesh = instMesh;
+    // Update Selection Visuals — delegate to renderer API if available
+    useEffect(() => {
+        if (rendererRef.current && rendererRef.current.updateSelection) {
+            try { rendererRef.current.updateSelection(selectedAtomIds, atoms); } catch (e) {}
         } else {
-            const sphereGeo = new THREE.SphereGeometry(1, DEFAULTS.VISUALS.SPHERE_SEGMENTS, DEFAULTS.VISUALS.SPHERE_SEGMENTS);
-            visibleAtoms.forEach(atom => {
-                const prop = getElementProp(atom.element);
-                const mat = new THREE.MeshStandardMaterial({
-                    color: prop.color, roughness: 0.3, metalness: 0.2,
-                    emissive: COLORS.general.black
+            const { atomMeshes, atomInstancedMesh, isInstanced, atomIdToInstanceId } = threeRef.current;
+            if (isInstanced && atomInstancedMesh) {
+                visibleAtoms.forEach((atom) => {
+                    const idx = atomIdToInstanceId.get(atom.id);
+                    if (idx !== undefined) {
+                        const prop = getElementProp(atom.element);
+                        const isSelected = selectedAtomIds.includes(atom.id);
+                        const color = new THREE.Color(prop.color);
+                        if (isSelected) color.add(new THREE.Color(COLORS.selection.emissive));
+                        atomInstancedMesh.setColorAt(idx, color);
+                    }
                 });
-                const mesh = new THREE.Mesh(sphereGeo, mat);
-                mesh.position.set(atom.x, atom.y, atom.z);
-                mesh.scale.setScalar(prop.radius * DEFAULTS.VISUALS.ATOM_SCALE);
-                mesh.userData = { type: 'atom', id: atom.id };
-                scene.add(mesh);
-                atomMeshes.set(atom.id, mesh);
-            });
-        }
-
-        // 4. Draw Bonds
-        if(visibleAtoms.length < 500) {
-            const bondMat = new THREE.MeshStandardMaterial({color: COLORS.general.white}); 
-            const bondGeo = new THREE.CylinderGeometry(DEFAULTS.VISUALS.BOND_RADIUS, DEFAULTS.VISUALS.BOND_RADIUS, 1, DEFAULTS.VISUALS.BOND_SEGMENTS);
-            bondGeo.translate(0,0.5,0); bondGeo.rotateX(Math.PI/2);
-            
-            const dummy = new THREE.Object3D();
-            const bondSegments = []; 
-
-            let latMat = null;
-            let invLatMat = null;
-            if (hasLattice) {
-                const [va, vb, vc] = lattice;
-                latMat = [
-                    [va[0], vb[0], vc[0]],
-                    [va[1], vb[1], vc[1]],
-                    [va[2], vb[2], vc[2]]
-                ];
-                invLatMat = MathUtils.inv3x3(latMat);
+                if (atomInstancedMesh.instanceColor) atomInstancedMesh.instanceColor.needsUpdate = true;
+            } else {
+                atomMeshes.forEach((mesh, id) => {
+                    const isSelected = selectedAtomIds.includes(id);
+                    if (mesh.material.emissive) mesh.material.emissive.set(isSelected ? COLORS.selection.emissive : COLORS.general.black);
+                });
             }
-
-            for(let i=0; i<visibleAtoms.length; i++){
-                for(let j=i+1; j<visibleAtoms.length; j++){
-                    const p1 = [visibleAtoms[i].x, visibleAtoms[i].y, visibleAtoms[i].z];
-                    const p2 = [visibleAtoms[j].x, visibleAtoms[j].y, visibleAtoms[j].z];
-                    
-                    let distVector = [p2[0]-p1[0], p2[1]-p1[1], p2[2]-p1[2]];
-                    
-                    if (invLatMat && latMat) {
-                        const frac = MathUtils.multiplyMatrixVector(invLatMat, distVector);
-                        const fracMic = [
-                            frac[0] - Math.floor(frac[0] + 0.5),
-                            frac[1] - Math.floor(frac[1] + 0.5),
-                            frac[2] - Math.floor(frac[2] + 0.5)
-                        ];
-                        distVector = MathUtils.multiplyMatrixVector(latMat, fracMic);
-                    }
-
-                    const distSq = distVector[0]**2 + distVector[1]**2 + distVector[2]**2;
-                    
-                    if (distSq < 1e-6) continue;
-
-                    const r1 = getVdw(visibleAtoms[i].element);
-                    const r2 = getVdw(visibleAtoms[j].element);
-                    const threshold = (r1 + r2) * DEFAULTS.VISUALS.BOND_THRESHOLD_FACTOR; 
-
-                    if(distSq < threshold**2){
-                        const halfVec = [distVector[0]*0.5, distVector[1]*0.5, distVector[2]*0.5];
-                        
-                        bondSegments.push({
-                            start: new THREE.Vector3(...p1),
-                            end: new THREE.Vector3(p1[0]+halfVec[0], p1[1]+halfVec[1], p1[2]+halfVec[2]),
-                            color: new THREE.Color(getElementProp(visibleAtoms[i].element).color)
-                        });
-
-                        bondSegments.push({
-                            start: new THREE.Vector3(...p2),
-                            end: new THREE.Vector3(p2[0]-halfVec[0], p2[1]-halfVec[1], p2[2]-halfVec[2]),
-                            color: new THREE.Color(getElementProp(visibleAtoms[j].element).color)
-                        });
-                    }
-                }
-            }
-
-            const instMesh = new THREE.InstancedMesh(bondGeo, bondMat, bondSegments.length);
-            bondSegments.forEach((seg, idx) => {
-                dummy.position.copy(seg.start);
-                dummy.lookAt(seg.end);
-                const len = seg.start.distanceTo(seg.end);
-                dummy.scale.set(1, 1, len);
-                dummy.updateMatrix();
-                instMesh.setMatrixAt(idx, dummy.matrix);
-                instMesh.setColorAt(idx, seg.color);
-            });
-            
-            if (instMesh.instanceColor) instMesh.instanceColor.needsUpdate = true;
-            instMesh.userData.type='bond';
-            scene.add(instMesh);
         }
-
-    }, [atoms, lattice, layers, theme]);
-
-    // Update Selection Visuals
-    useEffect(() => {
-        const { atomMeshes, atomInstancedMesh, isInstanced, atomIdToInstanceId } = threeRef.current;
-        
-        if (isInstanced && atomInstancedMesh) {
-            visibleAtoms.forEach((atom) => {
-                const idx = atomIdToInstanceId.get(atom.id);
-                if (idx !== undefined) {
-                    const prop = getElementProp(atom.element);
-                    const isSelected = selectedAtomIds.includes(atom.id);
-                    const color = new THREE.Color(prop.color);
-                    if (isSelected) {
-                        color.add(new THREE.Color(COLORS.selection.emissive)); 
-                    }
-                    atomInstancedMesh.setColorAt(idx, color);
-                }
-            });
-            if (atomInstancedMesh.instanceColor) atomInstancedMesh.instanceColor.needsUpdate = true;
-        } else {
-            atomMeshes.forEach((mesh, id) => {
-                const isSelected = selectedAtomIds.includes(id);
-                if (mesh.material.emissive) {
-                    mesh.material.emissive.set(isSelected ? COLORS.selection.emissive : COLORS.general.black);
-                }
-            });
-        }
-    }, [selectedAtomIds, atoms]);
+    }, [selectedAtomIds, atoms, currentRenderer]);
 
     // 处理选中逻辑和 TransformControls 绑定
     useEffect(() => {

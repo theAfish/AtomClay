@@ -48,6 +48,9 @@ export const MolecularProvider = ({ children }) => {
     const [viewMode, setViewMode] = useState('default'); // 'default' | 'protein'
     const [theme, setTheme] = useState('dark'); // 'dark' | 'light'
     const [showLangDropdown, setShowLangDropdown] = useState(false);
+    // Renderer selection
+    const [currentRenderer, setCurrentRenderer] = useState('three'); // 'three' | 'molstar' | 'canvas'
+    const [showRendererDropdown, setShowRendererDropdown] = useState(false);
 
     // Clear selection when active layer changes
     useEffect(() => {
@@ -285,6 +288,17 @@ export const MolecularProvider = ({ children }) => {
         setShowLangDropdown(false);
     };
 
+    const renderers = [
+        { id: 'three', label: 'Three.js' },
+        { id: 'custom', label: 'Shader' }
+    ];
+
+    const changeRenderer = (id) => {
+        if (!renderers.find(r => r.id === id)) return;
+        setCurrentRenderer(id);
+        setShowRendererDropdown(false);
+    };
+
     // Initial Load
     useEffect(() => {
         // Start empty; keep the default lattice from initial state (10x10x10)
@@ -320,6 +334,8 @@ export const MolecularProvider = ({ children }) => {
         handleDrop,
         changeLanguage
         , renameLayer
+        , // Renderer API
+        currentRenderer, setCurrentRenderer, renderers, showRendererDropdown, setShowRendererDropdown, changeRenderer
     };
 
     return (

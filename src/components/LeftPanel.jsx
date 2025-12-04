@@ -121,19 +121,7 @@ const LeftPanel = () => {
                     ) : t('None')}</p>
                     <p>{t('Atoms in layer')}: <span className="font-semibold">{layerAtomCount}</span> &nbsp;|&nbsp; {t('Total atoms')}: <span className="font-semibold">{totalAtomCount}</span></p>
                     <p>{t('Chemical Formula')}: <span className="font-bold">{formula || 'N/A'}</span></p>
-                    <div className="mt-2">
-                        <div className="text-xs mb-1 font-semibold">{t('Lattice Vectors')}:</div>
-                        {latticeExists ? (
-                            <div className="space-y-1 text-[11px]">
-                                <div>a: ({latticeToShow[0].map(v => v.toFixed(3)).join(', ')}) — {latticeLens[0].toFixed(3)} Å</div>
-                                <div>b: ({latticeToShow[1].map(v => v.toFixed(3)).join(', ')}) — {latticeLens[1].toFixed(3)} Å</div>
-                                <div>c: ({latticeToShow[2].map(v => v.toFixed(3)).join(', ')}) — {latticeLens[2].toFixed(3)} Å</div>
-                                <div className={`${textNoLattice} mt-1`}>{t('Cell Volume')}: {volume !== null ? `${volume.toFixed(3)} Å³` : 'N/A'}</div>
-                            </div>
-                        ) : (
-                            <div className={`text-[11px] ${textNoLattice}`}>{t('No lattice information')}</div>
-                        )}
-                    </div>
+                    {/* Lattice information removed from top info panel */}
                 </div>
             </div>
 
