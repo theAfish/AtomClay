@@ -6,7 +6,7 @@ import { getVdw } from '../constants/atomParams';
 import { COLORS } from '../constants/theme';
 import { DEFAULTS } from '../constants/defaults';
 import { MathUtils } from '../utils/math';
-import { createAtomMaterial, createBondMaterial } from './customShaders';
+import { createAtomMaterial, createBondMaterial, createOutlineMaterial } from './customShaders';
 
 export function createCustomRenderer() {
     const threeRef = {
@@ -26,7 +26,16 @@ export function createCustomRenderer() {
         isDragging: false,
         isBoxSelecting: false,
         lattice: null,
-        transformMode: 'translate'
+        transformMode: 'translate',
+        currentBackgroundColor: new THREE.Color(),
+        targetBackgroundColor: new THREE.Color(),
+        currentLatticeColor: new THREE.Color(),
+        targetLatticeColor: new THREE.Color(),
+        latticeMaterial: null,
+        currentOutlineColor: new THREE.Color(),
+        targetOutlineColor: new THREE.Color(),
+        outlineMaterials: [],
+        themeTransitionSpeed: 0.05 // Adjust for smoothness
     };
 
     let animationId = null;
@@ -41,7 +50,13 @@ export function createCustomRenderer() {
 
             const scene = new THREE.Scene();
             scene.up.set(0,0,1);
-            scene.background = new THREE.Color(COLORS.background.dark);
+            scene.background = new THREE.Color(theme === 'dark' ? COLORS.background.dark : COLORS.background.light);
+            threeRef.currentBackgroundColor.copy(scene.background);
+            threeRef.targetBackgroundColor.copy(scene.background);
+            threeRef.currentLatticeColor.set(theme === 'dark' ? COLORS.lattice.dark : COLORS.lattice.light);
+            threeRef.targetLatticeColor.copy(threeRef.currentLatticeColor);
+            threeRef.currentOutlineColor.set(theme === 'dark' ? 0xffffff : 0x111111);
+            threeRef.targetOutlineColor.copy(threeRef.currentOutlineColor);
             scene.add(new THREE.AmbientLight(COLORS.general.white, DEFAULTS.LIGHTING.AMBIENT_INTENSITY));
             const dirLight = new THREE.DirectionalLight(COLORS.general.white, DEFAULTS.LIGHTING.DIRECTIONAL_INTENSITY);
             dirLight.position.set(...DEFAULTS.LIGHTING.DIRECTIONAL_POSITION);
@@ -93,6 +108,21 @@ export function createCustomRenderer() {
             const animate = () => {
                 animationId = requestAnimationFrame(animate);
                 controls.update();
+                // Smooth theme transition
+                if (!threeRef.currentBackgroundColor.equals(threeRef.targetBackgroundColor)) {
+                    threeRef.currentBackgroundColor.lerp(threeRef.targetBackgroundColor, threeRef.themeTransitionSpeed);
+                    threeRef.scene.background.copy(threeRef.currentBackgroundColor);
+                }
+                if (threeRef.latticeMaterial && !threeRef.currentLatticeColor.equals(threeRef.targetLatticeColor)) {
+                    threeRef.currentLatticeColor.lerp(threeRef.targetLatticeColor, threeRef.themeTransitionSpeed);
+                    threeRef.latticeMaterial.color.copy(threeRef.currentLatticeColor);
+                }
+                if (threeRef.outlineMaterials.length > 0 && !threeRef.currentOutlineColor.equals(threeRef.targetOutlineColor)) {
+                    threeRef.currentOutlineColor.lerp(threeRef.targetOutlineColor, threeRef.themeTransitionSpeed);
+                    threeRef.outlineMaterials.forEach(mat => {
+                        if (mat.uniforms && mat.uniforms.uColor) mat.uniforms.uColor.value.copy(threeRef.currentOutlineColor);
+                    });
+                }
                 renderer.render(scene, camera);
                 try { if (drawGizmoRef.current) drawGizmoRef.current(); } catch(e) {}
             };
@@ -155,10 +185,15 @@ export function createCustomRenderer() {
             threeRef.lattice = lattice;
             const scene = threeRef.scene;
 
+            // Update scene background target based on theme
+            threeRef.targetBackgroundColor.set(theme === 'dark' ? COLORS.background.dark : COLORS.background.light);
+            threeRef.targetLatticeColor.set(theme === 'dark' ? COLORS.lattice.dark : COLORS.lattice.light);
+            threeRef.targetOutlineColor.set(theme === 'dark' ? 0xffffff : 0x111111);
+
             // Clear previous atom/bond/box
             const toRemove = [];
             scene.traverse(c => {
-                if (c.userData && (c.userData.type === 'atom' || c.userData.type === 'bond' || c.userData.type === 'box' || c.userData.type === 'atom-instanced')) toRemove.push(c);
+                if (c.userData && (c.userData.type === 'atom' || c.userData.type === 'bond' || c.userData.type === 'box' || c.userData.type === 'atom-instanced' || c.userData.type === 'atom-outline' || c.userData.type === 'bond-outline')) toRemove.push(c);
             });
             toRemove.forEach(c => {
                 scene.remove(c);
@@ -169,6 +204,8 @@ export function createCustomRenderer() {
             threeRef.atomInstancedMesh = null;
             threeRef.instanceIdToAtomId = [];
             threeRef.atomIdToInstanceId.clear && threeRef.atomIdToInstanceId.clear();
+            threeRef.outlineMaterials = [];
+            threeRef.latticeMaterial = null;
 
             if (!scene.children.includes(threeRef.controlAnchor)) scene.add(threeRef.controlAnchor);
 
@@ -186,9 +223,10 @@ export function createCustomRenderer() {
                 const pts = [];
                 [[o,a],[o,b],[o,c],[a,ab],[a,ac],[b,ab],[b,bc],[c,ac],[c,bc],[ab,abc],[ac,abc],[bc,abc]].forEach(pair=>{ pts.push(...pair[0], ...pair[1]); });
                 boxGeo.setAttribute('position', new THREE.Float32BufferAttribute(pts,3));
-                const boxLine = new THREE.LineSegments(boxGeo, new THREE.LineBasicMaterial({color: theme === 'dark' ? COLORS.lattice.dark : COLORS.lattice.light}));
+                const boxLine = new THREE.LineSegments(boxGeo, new THREE.LineBasicMaterial({color: threeRef.currentLatticeColor}));
                 boxLine.userData.type='box';
                 scene.add(boxLine);
+                threeRef.latticeMaterial = boxLine.material;
             }
 
             // Atoms
@@ -199,6 +237,11 @@ export function createCustomRenderer() {
 
             if (isLargeSystem) {
                 const sphereGeo = new THREE.SphereGeometry(1, DEFAULTS.VISUALS.SPHERE_SEGMENTS, DEFAULTS.VISUALS.SPHERE_SEGMENTS);
+                const outlineInstMesh = new THREE.InstancedMesh(sphereGeo, createOutlineMaterial({ color: threeRef.currentOutlineColor }), visibleAtoms.length);
+                outlineInstMesh.material.defines = { USE_INSTANCING: 1 };
+                outlineInstMesh.material.needsUpdate = true;
+                threeRef.outlineMaterials.push(outlineInstMesh.material);
+
                 const instMesh = new THREE.InstancedMesh(sphereGeo, createAtomMaterial({}), visibleAtoms.length);
                 // Tell material to support instancing via define
                 instMesh.material.defines = Object.assign({}, instMesh.material.defines, { USE_INSTANCING: 1 });
@@ -208,14 +251,22 @@ export function createCustomRenderer() {
                 visibleAtoms.forEach((atom, i) => {
                     const prop = getElementProp(atom.element);
                     dummy.position.set(atom.x, atom.y, atom.z);
-                    dummy.scale.setScalar(prop.radius * DEFAULTS.VISUALS.ATOM_SCALE);
+                    const scale = prop.radius * DEFAULTS.VISUALS.ATOM_SCALE;
+                    dummy.scale.setScalar(scale);
                     dummy.updateMatrix();
                     instMesh.setMatrixAt(i, dummy.matrix);
                     const color = new THREE.Color(prop.color);
                     try { instMesh.setColorAt(i, color); } catch(e) {}
                     threeRef.instanceIdToAtomId[i] = atom.id;
                     threeRef.atomIdToInstanceId.set && threeRef.atomIdToInstanceId.set(atom.id, i);
+
+                    // For outline
+                    dummy.scale.setScalar(scale * 1.05);
+                    dummy.updateMatrix();
+                    outlineInstMesh.setMatrixAt(i, dummy.matrix);
                 });
+                outlineInstMesh.userData = { type: 'atom-outline' };
+                scene.add(outlineInstMesh);
                 instMesh.userData = { type: 'atom-instanced' };
                 scene.add(instMesh);
                 threeRef.atomInstancedMesh = instMesh;
@@ -223,10 +274,19 @@ export function createCustomRenderer() {
                 const sphereGeo = new THREE.SphereGeometry(1, DEFAULTS.VISUALS.SPHERE_SEGMENTS, DEFAULTS.VISUALS.SPHERE_SEGMENTS);
                 visibleAtoms.forEach(atom => {
                     const prop = getElementProp(atom.element);
+                    const scale = prop.radius * DEFAULTS.VISUALS.ATOM_SCALE;
+                    const outlineMat = createOutlineMaterial({ color: threeRef.currentOutlineColor });
+                    const outlineMesh = new THREE.Mesh(sphereGeo, outlineMat);
+                    outlineMesh.position.set(atom.x, atom.y, atom.z);
+                    outlineMesh.scale.setScalar(scale * 1.05);
+                    outlineMesh.userData = { type: 'atom-outline' };
+                    scene.add(outlineMesh);
+                    threeRef.outlineMaterials.push(outlineMat);
+
                     const mat = createAtomMaterial({ color: new THREE.Color(prop.color) });
                     const mesh = new THREE.Mesh(sphereGeo, mat);
                     mesh.position.set(atom.x, atom.y, atom.z);
-                    mesh.scale.setScalar(prop.radius * DEFAULTS.VISUALS.ATOM_SCALE);
+                    mesh.scale.setScalar(scale);
                     mesh.userData = { type: 'atom', id: atom.id };
                     scene.add(mesh);
                     threeRef.atomMeshes.set(atom.id, mesh);
@@ -291,6 +351,27 @@ export function createCustomRenderer() {
                 });
                 if (instMesh.instanceColor) instMesh.instanceColor.needsUpdate = true;
                 if (instMesh.instanceMatrix) instMesh.instanceMatrix.needsUpdate = true;
+
+                // Outline for bonds
+                const outlineBondMat = createOutlineMaterial({ color: threeRef.currentOutlineColor });
+                outlineBondMat.defines = { USE_INSTANCING: 1 };
+                outlineBondMat.needsUpdate = true;
+                threeRef.outlineMaterials.push(outlineBondMat);
+                const outlineInstMesh = new THREE.InstancedMesh(bondGeo, outlineBondMat, bondSegments.length);
+                bondSegments.forEach((seg, idx) => {
+                    const v = new THREE.Vector3().subVectors(seg.end, seg.start);
+                    const len = v.length();
+                    const mid = new THREE.Vector3().addVectors(seg.start, seg.end).multiplyScalar(0.5);
+                    const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,0,1), v.clone().normalize());
+                    dummy.position.copy(mid);
+                    dummy.quaternion.copy(quat);
+                    dummy.scale.set(1.05, 1.05, len);
+                    dummy.updateMatrix();
+                    outlineInstMesh.setMatrixAt(idx, dummy.matrix);
+                });
+                outlineInstMesh.userData.type = 'bond-outline';
+                scene.add(outlineInstMesh);
+
                 instMesh.userData.type = 'bond';
                 scene.add(instMesh);
             }

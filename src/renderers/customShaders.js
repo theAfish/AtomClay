@@ -67,21 +67,22 @@ uniform float uSelectionFactor;
 
 void main() {
     vec3 N = normalize(vNormal);
-    // light direction is (assumed) normalized and in view-space: we transform it
-    // here by ignoring camera transform simplicity; assume it's in view space
     vec3 L = normalize(uLightDirection);
-    float lambert = max(dot(N, L), 0.0);
+    float intensity = max(dot(N, L), 0.0);
 
-    // Simple Blinn-Phong
-    vec3 V = normalize(-vViewPos);
-    vec3 H = normalize(L + V);
-    float spec = pow(max(dot(N, H), 0.0), uShininess);
+    // Toon shading: band the intensity
+    float toon;
+    if (intensity > 0.8) {
+        toon = 1.0;
+    } else if (intensity > 0.3) {
+        toon = 0.6;
+    } else {
+        toon = 0.3;
+    }
 
     vec3 ambient = uAmbientColor;
-    vec3 diffuse = vBaseColor * lambert;
-    vec3 specular = uSpecularColor * spec;
-
-    vec3 color = ambient + diffuse + specular;
+    vec3 diffuse = vBaseColor * toon;
+    vec3 color = ambient + diffuse;
 
     // Apply selection additive highlight (uSelectionFactor 0-1)
     color = mix(color, color + uSelectionEmissive, uSelectionFactor);
@@ -142,6 +143,54 @@ export function createBondMaterial({ color = new THREE.Color(0xcccccc), lightDir
             uAmbientColor: { value: ambient }
         },
         side: THREE.DoubleSide
+    });
+    return mat;
+}
+
+// Outline shaders for backface outline technique
+export const outlineVertex = `
+precision highp float;
+
+attribute vec3 position;
+attribute vec3 normal;
+#ifdef USE_INSTANCING
+  attribute mat4 instanceMatrix;
+#endif
+
+uniform mat4 modelViewMatrix;
+uniform mat4 projectionMatrix;
+
+void main() {
+    vec4 worldPos;
+#ifdef USE_INSTANCING
+    worldPos = instanceMatrix * vec4(position, 1.0);
+#else
+    worldPos = vec4(position, 1.0);
+#endif
+    vec4 mvPos = modelViewMatrix * worldPos;
+    gl_Position = projectionMatrix * mvPos;
+}
+`;
+
+export const outlineFragment = `
+precision highp float;
+
+uniform vec3 uColor;
+
+void main() {
+    gl_FragColor = vec4(uColor, 1.0);
+}
+`;
+
+export function createOutlineMaterial({ color = new THREE.Color(0x000000) } = {}) {
+    const mat = new THREE.RawShaderMaterial({
+        vertexShader: outlineVertex,
+        fragmentShader: outlineFragment,
+        uniforms: {
+            uColor: { value: color }
+        },
+        side: THREE.BackSide,
+        transparent: false
     });
     return mat;
 }

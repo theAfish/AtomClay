@@ -16,7 +16,8 @@ const RightPanel = () => {
         updateAtoms,
         theme,
         // Layers-related state moved from LeftPanel
-        layers, setLayers, activeLayerId, setActiveLayerId, setLattice, renameLayer, lattice
+        layers, setLayers, activeLayerId, setActiveLayerId, setLattice, renameLayer, lattice,
+        isChatOpen
     } = useMolecularContext();
 
     const selectedCount = selectedAtomIds.length;
@@ -63,7 +64,7 @@ const RightPanel = () => {
     const [editingName, setEditingName] = useState('');
 
     return (
-        <div className="absolute top-4 right-4 w-80 pointer-events-none">
+        <div className="absolute top-4 w-80 pointer-events-none" style={{ right: isChatOpen ? '336px' : '16px' }}>
             <div className={`${panelClass} p-4 rounded-xl shadow-xl pointer-events-auto`}> 
                 <h2 className={`text-sm font-bold mb-3 flex items-center gap-2 ${textPrimary}`}>
                     <Scissors size={16} /> {t('Edit Tools')}

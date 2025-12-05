@@ -35,7 +35,13 @@ export function createThreeRenderer() {
         isDragging: false,
         isBoxSelecting: false,
         lattice: null,
-        transformMode: 'translate'
+        transformMode: 'translate',
+        currentBackgroundColor: new THREE.Color(),
+        targetBackgroundColor: new THREE.Color(),
+        currentLatticeColor: new THREE.Color(),
+        targetLatticeColor: new THREE.Color(),
+        latticeMaterial: null,
+        themeTransitionSpeed: 0.05 // Adjust for smoothness
     };
 
     let animationId = null;
@@ -53,7 +59,11 @@ export function createThreeRenderer() {
             if (THREE.Object3D && THREE.Object3D.DefaultUp && THREE.Object3D.DefaultUp.set) {
                 THREE.Object3D.DefaultUp.set(0, 0, 1);
             }
-            scene.background = new THREE.Color(COLORS.background.dark);
+            scene.background = new THREE.Color(theme === 'dark' ? COLORS.background.dark : COLORS.background.light);
+            threeRef.currentBackgroundColor.copy(scene.background);
+            threeRef.targetBackgroundColor.copy(scene.background);
+            threeRef.currentLatticeColor.set(theme === 'dark' ? COLORS.lattice.dark : COLORS.lattice.light);
+            threeRef.targetLatticeColor.copy(threeRef.currentLatticeColor);
             scene.add(new THREE.AmbientLight(COLORS.general.white, DEFAULTS.LIGHTING.AMBIENT_INTENSITY));
             const dirLight = new THREE.DirectionalLight(COLORS.general.white, DEFAULTS.LIGHTING.DIRECTIONAL_INTENSITY);
             dirLight.position.set(...DEFAULTS.LIGHTING.DIRECTIONAL_POSITION);
@@ -110,6 +120,15 @@ export function createThreeRenderer() {
             const animate = () => {
                 animationId = requestAnimationFrame(animate);
                 controls.update();
+                // Smooth theme transition
+                if (!threeRef.currentBackgroundColor.equals(threeRef.targetBackgroundColor)) {
+                    threeRef.currentBackgroundColor.lerp(threeRef.targetBackgroundColor, threeRef.themeTransitionSpeed);
+                    threeRef.scene.background.copy(threeRef.currentBackgroundColor);
+                }
+                if (threeRef.latticeMaterial && !threeRef.currentLatticeColor.equals(threeRef.targetLatticeColor)) {
+                    threeRef.currentLatticeColor.lerp(threeRef.targetLatticeColor, threeRef.themeTransitionSpeed);
+                    threeRef.latticeMaterial.color.copy(threeRef.currentLatticeColor);
+                }
                 renderer.render(scene, camera);
                 try { if (drawGizmoRef.current) drawGizmoRef.current(); } catch (e) {}
             };
@@ -176,6 +195,9 @@ export function createThreeRenderer() {
             threeRef.lattice = lattice;
 
             const scene = threeRef.scene;
+            // Update scene background target based on theme
+            threeRef.targetBackgroundColor.set(theme === 'dark' ? COLORS.background.dark : COLORS.background.light);
+            threeRef.targetLatticeColor.set(theme === 'dark' ? COLORS.lattice.dark : COLORS.lattice.light);
             const atomMeshes = threeRef.atomMeshes;
             const controlAnchor = threeRef.controlAnchor;
 
@@ -209,9 +231,10 @@ export function createThreeRenderer() {
                 const pts = [];
                 [[o,a],[o,b],[o,c],[a,ab],[a,ac],[b,ab],[b,bc],[c,ac],[c,bc],[ab,abc],[ac,abc],[bc,abc]].forEach(pair=>{ pts.push(...pair[0], ...pair[1]); });
                 boxGeo.setAttribute('position', new THREE.Float32BufferAttribute(pts,3));
-                const boxLine = new THREE.LineSegments(boxGeo, new THREE.LineBasicMaterial({color: theme === 'dark' ? COLORS.lattice.dark : COLORS.lattice.light}));
+                const boxLine = new THREE.LineSegments(boxGeo, new THREE.LineBasicMaterial({color: threeRef.currentLatticeColor}));
                 boxLine.userData.type='box';
                 scene.add(boxLine);
+                threeRef.latticeMaterial = boxLine.material;
             }
 
             // Atoms (instanced when large)

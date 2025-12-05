@@ -51,6 +51,8 @@ export const MolecularProvider = ({ children }) => {
     // Renderer selection
     const [currentRenderer, setCurrentRenderer] = useState('three'); // 'three' | 'molstar' | 'canvas'
     const [showRendererDropdown, setShowRendererDropdown] = useState(false);
+    // Chat panel
+    const [isChatOpen, setIsChatOpen] = useState(false);
 
     // Clear selection when active layer changes
     useEffect(() => {
@@ -319,6 +321,7 @@ export const MolecularProvider = ({ children }) => {
         viewMode, setViewMode,
         theme, setTheme,
         showLangDropdown, setShowLangDropdown,
+        isChatOpen, setIsChatOpen,
         
         // Handlers
         handleLoad,

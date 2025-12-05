@@ -354,6 +354,7 @@ const Viewer = () => {
     // Update Camera Target
     useEffect(() => {
         const { controls } = threeRef.current;
+        if (!controls) return; // controls may be undefined during renderer init
         const hasLattice = Array.isArray(lattice) && lattice.length === 3 && lattice.every(v => Array.isArray(v) && v.length === 3);
         if (hasLattice) {
             const cx = (lattice[0][0]+lattice[1][0]+lattice[2][0])*0.5;
@@ -376,7 +377,7 @@ const Viewer = () => {
             }
         }
         controls.update();
-    }, [lattice, atoms, layers]);
+    }, [lattice, atoms, layers, currentRenderer]);
 
     // Keep lattice available to the render loop / gizmo
     useEffect(() => {

@@ -4,6 +4,7 @@ import Viewer from './components/Viewer';
 import MolstarViewer from './components/MolstarViewer';
 import LeftPanel from './components/LeftPanel';
 import RightPanel from './components/RightPanel';
+import ChatPanel from './components/ChatPanel';
 import { MolecularProvider, useMolecularContext } from './context/MolecularContext';
 import ErrorBanner from './components/UI/ErrorBanner';
 import ViewModeToggle from './components/UI/ViewModeToggle';
@@ -17,7 +18,9 @@ function AppContent() {
         viewMode,
         theme,
         handleDragOver,
-        handleDrop
+        handleDrop,
+        isChatOpen,
+        setIsChatOpen
     } = useMolecularContext();
 
     const { t, i18n } = useTranslation();
@@ -27,23 +30,26 @@ function AppContent() {
     }, [i18n.language, t]);
 
     return (
-        <div className="relative w-full h-full font-sans select-none" onDragOver={handleDragOver} onDrop={handleDrop}>
-            <ErrorBanner />
-            <ViewModeToggle />
-            <FloatingControls />
+        <div className="relative w-full h-full font-sans select-none flex" onDragOver={handleDragOver} onDrop={handleDrop}>
+            <div className={`flex-1 relative ${isChatOpen ? 'mr-80' : ''} transition-all duration-300`}>
+                <ErrorBanner />
+                <ViewModeToggle />
+                <FloatingControls />
 
-            <ErrorBoundary>
-                {viewMode === 'protein' && pdbContent ? (
-                    <MolstarViewer pdbContent={pdbContent} theme={theme} />
-                ) : (
-                    <Viewer />
-                )}
-            </ErrorBoundary>
+                <ErrorBoundary>
+                    {viewMode === 'protein' && pdbContent ? (
+                        <MolstarViewer pdbContent={pdbContent} theme={theme} />
+                    ) : (
+                        <Viewer />
+                    )}
+                </ErrorBoundary>
 
-            <LeftPanel />
-            <RightPanel />
-            
-            <FooterHelp />
+                <LeftPanel />
+                <RightPanel />
+                
+                <FooterHelp />
+            </div>
+            <ChatPanel isOpen={isChatOpen} onToggle={() => setIsChatOpen(!isChatOpen)} />
         </div>
     );
 }
