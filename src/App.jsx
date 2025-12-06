@@ -30,7 +30,7 @@ function AppContent() {
     }, [i18n.language, t]);
 
     return (
-        <div className="relative w-full h-full font-sans select-none flex" onDragOver={handleDragOver} onDrop={handleDrop}>
+        <div className={`relative w-full h-full font-sans select-none flex ${theme === 'dark' ? 'text-white' : 'text-slate-800'}`} onDragOver={handleDragOver} onDrop={handleDrop}>
             <div className={`flex-1 relative ${isChatOpen ? 'mr-80' : ''} transition-all duration-300`}>
                 <ErrorBanner />
                 <ViewModeToggle />

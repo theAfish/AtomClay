@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 /* Body background updated to a richer navy rather than flat gray */
-body { margin: 0; overflow: hidden; background: #0b1220; @apply text-white; }
+body { margin: 0; overflow: hidden; background: #0b1220; }
 #root { width: 100vw; height: 100vh; }
 canvas { display: block; outline: none; }
 ::-webkit-scrollbar { width: 8px; height: 8px; }

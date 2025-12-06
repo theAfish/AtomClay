@@ -1,8 +1,8 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { MathUtils } from '../utils/math';
 import { parse } from '../utils/parsers';
-import { calculateSupercell, calculateVacuum, calculateScaleLattice } from '../utils/structureOperations';
 import { DEFAULTS } from '../constants/defaults';
+import { handleSupercell as doSupercell, handleVacuum as doVacuum, handleScaleLattice as doScaleLattice, handleSetLattice as doSetLattice } from '../components/operations/latticeHandlers';
 
 export function useMolecularState() {
     // Layers State
@@ -68,72 +68,20 @@ export function useMolecularState() {
     // Operations
 
     const handleSupercell = useCallback((mode, diag, matrix) => {
-        const currentLatticeVal = lattice;
-        if (!currentLatticeVal) return;
-
-        // Filter atoms
-        const activeAtoms = atoms.filter(a => a.layerId === activeLayerId);
-        const otherAtoms = atoms.filter(a => a.layerId !== activeLayerId);
-        
-        let maxId = atoms.length > 0 ? Math.max(...atoms.map(a => a.id)) : -1;
-
-        const { newAtoms, newLattice } = calculateSupercell(activeAtoms, currentLatticeVal, mode, diag, matrix, maxId);
-        
-        saveStateToHistory(atoms, lattice, layers, activeLayerId, currentLatticeSourceId);
-        setLayers(prev => prev.map(l => l.id === activeLayerId ? { ...l, lattice: newLattice } : l));
-        setCurrentLattice(newLattice);
-        setAtoms([...otherAtoms, ...newAtoms]);
-    }, [atoms, lattice, layers, activeLayerId, saveStateToHistory, currentLatticeSourceId]);
+        doSupercell(atoms, lattice, layers, activeLayerId, saveStateToHistory, currentLatticeSourceId, setLayers, setCurrentLattice, setAtoms, mode, diag, matrix);
+    }, [atoms, lattice, layers, activeLayerId, saveStateToHistory, currentLatticeSourceId, setLayers, setCurrentLattice, setAtoms]);
 
     const handleVacuum = useCallback((size, axis = 2) => {
-        const currentLatticeVal = lattice;
-        if (!currentLatticeVal) return;
-        
-        // Filter atoms for active layer if needed, but vacuum usually applies to the whole cell or active layer's cell
-        // Here we pass all atoms but we might only want to affect active layer's atoms if we were modifying them.
-        // Since calculateVacuum returns identity for atoms, it's safe.
-        const activeAtoms = atoms.filter(a => a.layerId === activeLayerId);
-        const otherAtoms = atoms.filter(a => a.layerId !== activeLayerId);
-
-        const { newAtoms, newLattice } = calculateVacuum(activeAtoms, currentLatticeVal, size, axis);
-        
-        saveStateToHistory(atoms, lattice, layers, activeLayerId, currentLatticeSourceId);
-        setLayers(prev => prev.map(l => l.id === activeLayerId ? { ...l, lattice: newLattice } : l));
-        setCurrentLattice(newLattice);
-        // If atoms were modified, we would update them here:
-        // setAtoms([...otherAtoms, ...newAtoms]);
-    }, [atoms, lattice, layers, activeLayerId, saveStateToHistory, currentLatticeSourceId]);
+        doVacuum(atoms, lattice, layers, activeLayerId, saveStateToHistory, currentLatticeSourceId, setLayers, setCurrentLattice, size, axis);
+    }, [atoms, lattice, layers, activeLayerId, saveStateToHistory, currentLatticeSourceId, setLayers, setCurrentLattice]);
 
     const handleScaleLattice = useCallback((scaleX = 1, scaleY = 1, scaleZ = 1) => {
-        const currentLatticeVal = lattice;
-        if (!currentLatticeVal) return;
-        
-        const activeAtoms = atoms.filter(a => a.layerId === activeLayerId);
-        const otherAtoms = atoms.filter(a => a.layerId !== activeLayerId);
-
-        const { newAtoms, newLattice } = calculateScaleLattice(activeAtoms, currentLatticeVal, scaleX, scaleY, scaleZ);
-        
-        saveStateToHistory(atoms, lattice, layers, activeLayerId, currentLatticeSourceId);
-        setLayers(prev => prev.map(l => l.id === activeLayerId ? { ...l, lattice: newLattice } : l));
-        setCurrentLattice(newLattice);
-        // If atoms were modified:
-        // setAtoms([...otherAtoms, ...newAtoms]);
-    }, [atoms, lattice, layers, activeLayerId, saveStateToHistory, currentLatticeSourceId]);
+        doScaleLattice(atoms, lattice, layers, activeLayerId, saveStateToHistory, currentLatticeSourceId, setLayers, setCurrentLattice, scaleX, scaleY, scaleZ);
+    }, [atoms, lattice, layers, activeLayerId, saveStateToHistory, currentLatticeSourceId, setLayers, setCurrentLattice]);
 
     const handleSetLattice = useCallback((newLattice) => {
-        const currentLatticeVal = lattice;
-        if (!currentLatticeVal || !newLattice) return;
-
-        // Validate newLattice shape
-        if (!Array.isArray(newLattice) || newLattice.length !== 3 || !Array.isArray(newLattice[0])) {
-            throw new Error('Invalid lattice matrix');
-        }
-
-        // Atoms remain unchanged in Cartesian coordinates when replacing lattice matrix
-        saveStateToHistory(atoms, lattice, layers, activeLayerId, currentLatticeSourceId);
-        setLayers(prev => prev.map(l => l.id === activeLayerId ? { ...l, lattice: newLattice } : l));
-        setCurrentLattice(newLattice);
-    }, [atoms, lattice, layers, activeLayerId, saveStateToHistory, currentLatticeSourceId]);
+        doSetLattice(atoms, lattice, layers, activeLayerId, saveStateToHistory, currentLatticeSourceId, setLayers, setCurrentLattice, newLattice);
+    }, [atoms, lattice, layers, activeLayerId, saveStateToHistory, currentLatticeSourceId, setLayers, setCurrentLattice]);
 
     const addAtoms = useCallback((newAtoms, newLat, createNewLayer = false) => {
         let targetLayerId = activeLayerId;

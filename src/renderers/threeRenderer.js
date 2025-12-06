@@ -6,6 +6,7 @@ import { getVdw } from '../constants/atomParams';
 import { COLORS } from '../constants/theme';
 import { DEFAULTS } from '../constants/defaults';
 import { MathUtils } from '../utils/math';
+import { createResizeHandler, createAnimateLoop, setupClickHandlers } from './rendererCommon';
 
 /**
  * Creates a Three-based renderer instance. The instance encapsulates scene,
@@ -46,13 +47,15 @@ export function createThreeRenderer() {
 
     let animationId = null;
     let resizeHandler = null;
+    let animateController = null;
 
     const api = {
         threeRef,
 
         init(container, { onAtomClick, onAtomsMoveEnd, onBoxSelect, theme, lattice } = {}) {
-            const width = container.clientWidth;
-            const height = container.clientHeight;
+            const rectInit = container.getBoundingClientRect();
+            const width = Math.max(1, Math.floor(rectInit.width));
+            const height = Math.max(1, Math.floor(rectInit.height));
 
             const scene = new THREE.Scene();
             scene.up.set(0, 0, 1);
@@ -77,8 +80,14 @@ export function createThreeRenderer() {
             camera.position.set(...DEFAULTS.CAMERA.POSITION);
 
             const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-            renderer.setSize(width, height);
-            renderer.setPixelRatio(window.devicePixelRatio);
+            const dprInit = Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
+            renderer.setPixelRatio(dprInit);
+            renderer.setSize(width, height, true);
+            try {
+                renderer.domElement.style.display = 'block';
+                renderer.domElement.style.width = '100%';
+                renderer.domElement.style.height = '100%';
+            } catch (e) {}
             container.appendChild(renderer.domElement);
 
             const controls = new OrbitControls(camera, renderer.domElement);
@@ -107,84 +116,23 @@ export function createThreeRenderer() {
             threeRef.isInstanced = false;
             threeRef.lattice = lattice || null;
 
-            resizeHandler = () => {
-                const w = container.clientWidth;
-                const h = container.clientHeight;
-                camera.aspect = w/h;
-                camera.updateProjectionMatrix();
-                renderer.setSize(w,h);
-            };
+            resizeHandler = createResizeHandler(container, camera, renderer);
             window.addEventListener('resize', resizeHandler);
 
             // animation loop
-            const drawGizmo = () => {};
-            const drawGizmoRef = { current: drawGizmo };
+            const drawGizmoRef = { current: () => {} };
+            animateController = createAnimateLoop({ controls, renderer, scene, camera, drawGizmoRef, threeRef, extraUpdate: null });
+            animateController.start();
 
-            const animate = () => {
-                animationId = requestAnimationFrame(animate);
-                controls.update();
-                // Smooth theme transition
-                if (!threeRef.currentBackgroundColor.equals(threeRef.targetBackgroundColor)) {
-                    threeRef.currentBackgroundColor.lerp(threeRef.targetBackgroundColor, threeRef.themeTransitionSpeed);
-                    threeRef.scene.background.copy(threeRef.currentBackgroundColor);
-                }
-                if (threeRef.latticeMaterial && !threeRef.currentLatticeColor.equals(threeRef.targetLatticeColor)) {
-                    threeRef.currentLatticeColor.lerp(threeRef.targetLatticeColor, threeRef.themeTransitionSpeed);
-                    threeRef.latticeMaterial.color.copy(threeRef.currentLatticeColor);
-                }
-                renderer.render(scene, camera);
-                try { if (drawGizmoRef.current) drawGizmoRef.current(); } catch (e) {}
-            };
-            animate();
+            const clickHandlers = setupClickHandlers(renderer.domElement, camera, transformControl, threeRef, api, onAtomClick);
 
-            // Raycasting click handling
-            const raycaster = new THREE.Raycaster();
-            const mouse = new THREE.Vector2();
-
-            let mouseDownPos = { x: 0, y: 0 };
-            const onMouseDownClickCheck = (e) => { mouseDownPos = { x: e.clientX, y: e.clientY }; };
-            renderer.domElement.addEventListener('mousedown', onMouseDownClickCheck);
-
-            const onClick = (e) => {
-                const dist = Math.sqrt((e.clientX - mouseDownPos.x)**2 + (e.clientY - mouseDownPos.y)**2);
-                if (dist > DEFAULTS.INTERACTION.CLICK_DISTANCE_THRESHOLD) return;
-                if (transformControl.dragging || threeRef.isDragging) return;
-                if (threeRef.isBoxSelecting) return;
-
-                const rect = renderer.domElement.getBoundingClientRect();
-                mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-                mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-                raycaster.setFromCamera(mouse, camera);
-
-                let intersects = [];
-                if (threeRef.isInstanced && threeRef.atomInstancedMesh) intersects = raycaster.intersectObject(threeRef.atomInstancedMesh);
-                else intersects = raycaster.intersectObjects(Array.from(threeRef.atomMeshes.values()));
-
-                const currentAtoms = api._latestProps ? api._latestProps.atoms || [] : [];
-                const currentLayerId = api._latestProps ? api._latestProps.activeLayerId : null;
-                const activeLayerAtomIds = new Set(currentAtoms.filter(a => a.layerId === currentLayerId).map(a => a.id));
-
-                const validIntersects = [];
-                for (let hit of intersects) {
-                    let atomId;
-                    if (threeRef.isInstanced) atomId = threeRef.instanceIdToAtomId[hit.instanceId];
-                    else atomId = hit.object.userData.id;
-                    if (activeLayerAtomIds.has(atomId)) validIntersects.push(atomId);
-                }
-
-                if (validIntersects.length > 0) {
-                    if (onAtomClick) onAtomClick(validIntersects[0], e.ctrlKey || e.metaKey);
-                } else {
-                    if (onAtomClick) onAtomClick(null, e.ctrlKey || e.metaKey);
-                }
-            };
-            renderer.domElement.addEventListener('click', onClick);
+            api._raycaster = clickHandlers.raycaster;
+            api._mouse = clickHandlers.mouse;
+            api._clickRemover = clickHandlers.removeListeners;
 
             // store callbacks for later events
             api._callbacks = { onAtomClick, onAtomsMoveEnd, onBoxSelect };
             api._drawGizmoRef = drawGizmoRef;
-            api._raycaster = raycaster;
-            api._mouse = mouse;
 
             // Keep ref for latest props
             api._latestProps = { atoms: [], activeLayerId: null, theme };
@@ -374,9 +322,14 @@ export function createThreeRenderer() {
             }
         },
 
+        resize() {
+            if (resizeHandler) resizeHandler();
+        },
+
         dispose() {
-            if (animationId) cancelAnimationFrame(animationId);
-            if (resizeHandler) window.removeEventListener('resize', resizeHandler);
+            try { if (animateController && animateController.stop) animateController.stop(); } catch (e) {}
+            if (resizeHandler) try { window.removeEventListener('resize', resizeHandler); } catch(e) {}
+            if (api._clickRemover) try { api._clickRemover(); } catch(e) {}
             try {
                 if (threeRef.renderer && threeRef.renderer.domElement && threeRef.renderer.domElement.parentNode) {
                     threeRef.renderer.domElement.parentNode.removeChild(threeRef.renderer.domElement);

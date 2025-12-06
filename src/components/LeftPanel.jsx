@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { Box, Layers, Upload, Download, Grid, ChevronDown, Expand, Eye, EyeOff, Plus, Trash, Check, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useMolecularContext } from '../context/MolecularContext';
-import { PANEL_CLASSES } from '../constants/theme';
+import usePanelStyles from '../hooks/usePanelStyles';
 import { MathUtils } from '../utils/math';
 import { StructureInfo } from '../utils/structureInfo';
+import LayerNameEditor from './LayerNameEditor';
 
 const LeftPanel = () => {
     const { t } = useTranslation();
@@ -66,24 +67,8 @@ const LeftPanel = () => {
     const [editingName, setEditingName] = useState('');
 
     const isDark = theme === 'dark';
-    const panels = PANEL_CLASSES[theme] || PANEL_CLASSES.dark;
-    const panelClass = panels.panelClass;
-    const textPrimary = panels.textPrimary;
-    const textSecondary = panels.textSecondary;
-    const textMuted = panels.textMuted;
-    const bgInput = panels.bgInput;
-    const bgInputDarker = panels.bgInputDarker;
-    const borderClass = panels.borderClass;
-    const buttonSecondary = panels.buttonSecondary;
-    const buttonPrimary = panels.buttonPrimary;
-    const textTitle = panels.textTitle;
-    const textIcon = panels.textIcon;
-    const textLayerInfo = panels.textLayerInfo;
-    const textNoLattice = panels.textNoLattice;
-    const buttonPreset = panels.buttonPreset;
-    const layerTextActive = panels.layerTextActive;
-    const layerTextMuted = panels.layerTextMuted;
-    const layerTextAccent = panels.layerTextAccent;
+    const panels = usePanelStyles(theme);
+    const { panelClass, textPrimary, textSecondary, textMuted, bgInput, bgInputDarker, borderClass, buttonSecondary, buttonPrimary, textTitle, textIcon, textLayerInfo, textNoLattice, buttonPreset, layerTextActive, layerTextMuted, layerTextAccent } = panels;
 
     return (
         <div className="absolute top-4 left-4 w-80 flex flex-col gap-4 pointer-events-none">
@@ -103,20 +88,7 @@ const LeftPanel = () => {
                 <div className={`text-xs font-mono p-2 rounded border ${panels.bgCard} ${textSecondary} ${borderClass}`}>
                     <p className="font-bold">{t('Active Layer')}: {activeLayer ? (
                         <span className="inline-flex items-center gap-2">
-                            {editingActiveLayerId === activeLayer.id ? (
-                                <span className="inline-flex items-center gap-2">
-                                    <input autoFocus type="text" value={editingActiveName} onChange={e=>setEditingActiveName(e.target.value)} onKeyDown={e=>{
-                                        if(e.key === 'Enter') { renameLayer(activeLayer.id, editingActiveName || activeLayer.name); setEditingActiveLayerId(null); setEditingActiveName(''); }
-                                        if(e.key === 'Escape') { setEditingActiveLayerId(null); setEditingActiveName(''); }
-                                    }} className={`flex-1 min-w-0 max-w-[200px] h-6 leading-tight text-sm ${bgInput} border ${borderClass} rounded px-2 ${textPrimary}`} />
-                                    <button onClick={() => { renameLayer(activeLayer.id, editingActiveName || activeLayer.name); setEditingActiveLayerId(null); setEditingActiveName(''); }} className={`p-1 ${layerTextAccent}`} title="Save"><Check size={14} /></button>
-                                    <button onClick={() => { setEditingActiveLayerId(null); setEditingActiveName(''); }} className={`p-1 ${layerTextMuted}`} title="Cancel"><X size={14} /></button>
-                                </span>
-                            ) : (
-                                <span className="inline-flex items-center gap-2">
-                                    <span onDoubleClick={() => { setEditingActiveLayerId(activeLayer.id); setEditingActiveName(activeLayer.name); }}>{activeLayer.name}</span>
-                                </span>
-                            )}
+                            <LayerNameEditor layer={activeLayer} onRename={renameLayer} inputClass={`${bgInput} border ${borderClass} rounded px-2 ${textPrimary}`} />
                         </span>
                     ) : t('None')}</p>
                     <p>{t('Atoms in layer')}: <span className="font-semibold">{layerAtomCount}</span> &nbsp;|&nbsp; {t('Total atoms')}: <span className="font-semibold">{totalAtomCount}</span></p>

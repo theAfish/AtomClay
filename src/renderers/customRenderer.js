@@ -7,6 +7,7 @@ import { COLORS } from '../constants/theme';
 import { DEFAULTS } from '../constants/defaults';
 import { MathUtils } from '../utils/math';
 import { createAtomMaterial, createBondMaterial, createOutlineMaterial } from './customShaders';
+import { createResizeHandler, createAnimateLoop, setupClickHandlers } from './rendererCommon';
 
 export function createCustomRenderer() {
     const threeRef = {
@@ -40,6 +41,7 @@ export function createCustomRenderer() {
 
     let animationId = null;
     let resizeHandler = null;
+    let animateController = null;
 
     const api = {
         threeRef,
@@ -94,86 +96,32 @@ export function createCustomRenderer() {
             threeRef.atomIdToInstanceId.clear && threeRef.atomIdToInstanceId.clear();
             threeRef.lattice = lattice || null;
 
-            resizeHandler = () => {
-                const w = container.clientWidth;
-                const h = container.clientHeight;
-                camera.aspect = w/h;
-                camera.updateProjectionMatrix();
-                renderer.setSize(w,h);
-            };
+            resizeHandler = createResizeHandler(container, camera, renderer);
             window.addEventListener('resize', resizeHandler);
 
             // animate loop
             const drawGizmoRef = { current: () => {} };
-            const animate = () => {
-                animationId = requestAnimationFrame(animate);
-                controls.update();
-                // Smooth theme transition
-                if (!threeRef.currentBackgroundColor.equals(threeRef.targetBackgroundColor)) {
-                    threeRef.currentBackgroundColor.lerp(threeRef.targetBackgroundColor, threeRef.themeTransitionSpeed);
-                    threeRef.scene.background.copy(threeRef.currentBackgroundColor);
-                }
-                if (threeRef.latticeMaterial && !threeRef.currentLatticeColor.equals(threeRef.targetLatticeColor)) {
-                    threeRef.currentLatticeColor.lerp(threeRef.targetLatticeColor, threeRef.themeTransitionSpeed);
-                    threeRef.latticeMaterial.color.copy(threeRef.currentLatticeColor);
-                }
-                if (threeRef.outlineMaterials.length > 0 && !threeRef.currentOutlineColor.equals(threeRef.targetOutlineColor)) {
-                    threeRef.currentOutlineColor.lerp(threeRef.targetOutlineColor, threeRef.themeTransitionSpeed);
-                    threeRef.outlineMaterials.forEach(mat => {
-                        if (mat.uniforms && mat.uniforms.uColor) mat.uniforms.uColor.value.copy(threeRef.currentOutlineColor);
-                    });
-                }
-                renderer.render(scene, camera);
-                try { if (drawGizmoRef.current) drawGizmoRef.current(); } catch(e) {}
+            const extraUpdate = (tr) => {
+                try {
+                    if (tr && tr.outlineMaterials && tr.outlineMaterials.length > 0 && tr.currentOutlineColor && tr.targetOutlineColor && !tr.currentOutlineColor.equals(tr.targetOutlineColor)) {
+                        tr.currentOutlineColor.lerp(tr.targetOutlineColor, tr.themeTransitionSpeed || 0.05);
+                        tr.outlineMaterials.forEach(mat => {
+                            if (mat.uniforms && mat.uniforms.uColor) mat.uniforms.uColor.value.copy(tr.currentOutlineColor);
+                            else if (mat.color && typeof mat.color.copy === 'function') mat.color.copy(tr.currentOutlineColor);
+                        });
+                    }
+                } catch (e) {}
             };
-            animate();
+            animateController = createAnimateLoop({ controls, renderer, scene, camera, drawGizmoRef, threeRef, extraUpdate });
+            animateController.start();
 
-            // click handling
-            const raycaster = new THREE.Raycaster();
-            const mouse = new THREE.Vector2();
-            let mouseDownPos = { x: 0, y: 0 };
-            const onMouseDownClickCheck = (e) => { mouseDownPos = { x: e.clientX, y: e.clientY }; };
-            renderer.domElement.addEventListener('mousedown', onMouseDownClickCheck);
-
-            const onClick = (e) => {
-                const dist = Math.sqrt((e.clientX - mouseDownPos.x)**2 + (e.clientY - mouseDownPos.y)**2);
-                if (dist > DEFAULTS.INTERACTION.CLICK_DISTANCE_THRESHOLD) return;
-                if (transformControl.dragging || threeRef.isDragging) return;
-                if (threeRef.isBoxSelecting) return;
-
-                const rect = renderer.domElement.getBoundingClientRect();
-                mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-                mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-                raycaster.setFromCamera(mouse, camera);
-
-                let intersects = [];
-                if (threeRef.isInstanced && threeRef.atomInstancedMesh) intersects = raycaster.intersectObject(threeRef.atomInstancedMesh);
-                else intersects = raycaster.intersectObjects(Array.from(threeRef.atomMeshes.values()));
-
-                const currentAtoms = api._latestProps ? api._latestProps.atoms || [] : [];
-                const currentLayerId = api._latestProps ? api._latestProps.activeLayerId : null;
-                const activeLayerAtomIds = new Set(currentAtoms.filter(a => a.layerId === currentLayerId).map(a => a.id));
-
-                const validIntersects = [];
-                for (let hit of intersects) {
-                    let atomId;
-                    if (threeRef.isInstanced) atomId = threeRef.instanceIdToAtomId[hit.instanceId];
-                    else atomId = hit.object.userData.id;
-                    if (activeLayerAtomIds.has(atomId)) validIntersects.push(atomId);
-                }
-
-                if (validIntersects.length > 0) {
-                    if (onAtomClick) onAtomClick(validIntersects[0], e.ctrlKey || e.metaKey);
-                } else {
-                    if (onAtomClick) onAtomClick(null, e.ctrlKey || e.metaKey);
-                }
-            };
-            renderer.domElement.addEventListener('click', onClick);
+            const clickHandlers = setupClickHandlers(renderer.domElement, camera, transformControl, threeRef, api, onAtomClick);
+            api._raycaster = clickHandlers.raycaster;
+            api._mouse = clickHandlers.mouse;
+            api._clickRemover = clickHandlers.removeListeners;
 
             api._callbacks = { onAtomClick, onAtomsMoveEnd, onBoxSelect };
             api._drawGizmoRef = drawGizmoRef;
-            api._raycaster = raycaster;
-            api._mouse = mouse;
 
             api._latestProps = { atoms: [], activeLayerId: null, theme };
             return threeRef;
@@ -420,9 +368,14 @@ export function createCustomRenderer() {
             }
         },
 
+        resize() {
+            if (resizeHandler) resizeHandler();
+        },
+
         dispose() {
-            if (animationId) cancelAnimationFrame(animationId);
-            if (resizeHandler) window.removeEventListener('resize', resizeHandler);
+            try { if (animateController && animateController.stop) animateController.stop(); } catch (e) {}
+            if (resizeHandler) try { window.removeEventListener('resize', resizeHandler); } catch(e) {}
+            if (api._clickRemover) try { api._clickRemover(); } catch(e) {}
             try {
                 if (threeRef.renderer && threeRef.renderer.domElement && threeRef.renderer.domElement.parentNode) {
                     threeRef.renderer.domElement.parentNode.removeChild(threeRef.renderer.domElement);

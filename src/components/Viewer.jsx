@@ -1,20 +1,22 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import * as THREE from 'three';
-import { createThreeRenderer, createCustomRenderer } from '../renderers';
-import { getElementProp } from '../constants/elements';
-import { getVdw } from '../constants/atomParams';
 import { COLORS } from '../constants/theme';
 import { DEFAULTS } from '../constants/defaults';
 import { MathUtils } from '../utils/math';
 import { useMolecularContext } from '../context/MolecularContext';
 import { useGizmo } from '../hooks/useGizmo';
 import { useBoxSelection } from '../hooks/useBoxSelection';
+import { handleDraggingChanged, handleTransformChange } from './operations/transformHandlers';
+import { updateControlAttachment } from './operations/transformAttachment';
+import { applyTransformMode } from './operations/transformMode';
+import { initializeRenderer, syncRendererScene } from '../utils/rendererUtils';
+import { updateSelectionVisuals } from '../utils/selectionUtils';
 
 const Viewer = () => {
     const {
         atoms, lattice, layers, activeLayerId,
         selectedAtomIds, onAtomClick, onAtomsMoveEnd, onBoxSelect,
-        transformMode, editMode, theme, currentRenderer
+        transformMode, editMode, theme, currentRenderer, isChatOpen
     } = useMolecularContext();
 
     const containerRef = useRef(null);
@@ -60,206 +62,36 @@ const Viewer = () => {
 
     // Initialize renderer (three-based) and wire up callbacks (re-init when `currentRenderer` changes)
     useEffect(() => {
-        if (!containerRef.current) return;
-        // Dispose previous renderer if present
-        if (rendererRef.current) {
-            try { rendererRef.current.dispose(); } catch (e) {}
-            rendererRef.current = null;
-        }
-
-        const rendererApi = currentRenderer === 'custom' ? createCustomRenderer() : createThreeRenderer();
-        rendererRef.current = rendererApi;
-        rendererApi.init(containerRef.current, { onAtomClick, onAtomsMoveEnd, onBoxSelect, theme, lattice });
-
-        // Replace our threeRef.current with renderer's internal threeRef object so
-        // existing hooks and logic continue to work.
-        threeRef.current = rendererApi.threeRef;
-
-        // Provide the drawGizmo function to renderer's animate loop
-        if (rendererApi._drawGizmoRef) rendererApi._drawGizmoRef.current = drawGizmoRef.current;
-
-        // Forward latestProps for click filtering inside renderer
-        rendererApi._latestProps = latestProps.current;
-
-        // Sync initial scene to renderer
-        try { if (rendererApi.syncScene) rendererApi.syncScene({ atoms, lattice, layers, activeLayerId, theme }); } catch(e) {}
-
-        return () => {
-            try { rendererApi.dispose(); } catch (e) {}
-        };
+        return initializeRenderer(containerRef, currentRenderer, onAtomClick, onAtomsMoveEnd, onBoxSelect, theme, lattice, drawGizmoRef, latestProps, atoms, layers, activeLayerId, rendererRef, threeRef);
     }, [currentRenderer]); // Re-init when renderer changes
 
 
-    // 响应 TransformControls 拖拽结束，通知 App 更新坐标
+    // Wire TransformControls events to extracted handlers
     useEffect(() => {
-        const { transformControl, controlAnchor, atomMeshes, dragStartPos, initialAtomPositions, controls, atomInstancedMesh, isInstanced, atomIdToInstanceId } = threeRef.current;
+        const { transformControl, controls } = threeRef.current;
         // Ensure we have additional tracking for rotation/scale
         if (!threeRef.current.initialAnchorQuaternion) threeRef.current.initialAnchorQuaternion = new THREE.Quaternion();
         if (!threeRef.current.initialAnchorScale) threeRef.current.initialAnchorScale = new THREE.Vector3(1,1,1);
         if (!threeRef.current.initialAnchorPos) threeRef.current.initialAnchorPos = new THREE.Vector3();
         if (!threeRef.current.initialAtomPositionsRelative) threeRef.current.initialAtomPositionsRelative = new Map();
-        
-        const onDragChange = (event) => {
-            if (event.value) {
-                // Drag Start
-                threeRef.current.isDragging = true;
-                controls.enabled = false;
-                dragStartPos.copy(controlAnchor.position);
-                threeRef.current.initialAnchorPos = controlAnchor.position.clone();
-                threeRef.current.initialAnchorQuaternion.copy(controlAnchor.quaternion);
-                // initialAnchorScale should always exist (initialized above), copy current scale
-                threeRef.current.initialAnchorScale.copy(controlAnchor.scale);
-                initialAtomPositions.clear();
-                threeRef.current.initialAtomPositionsRelative.clear();
-                threeRef.current.initialAtomPositionsRelativeLocal = new Map();
-                
-                const dummy = new THREE.Object3D();
 
-                selectedAtomIds.forEach(id => {
-                    let pos = null;
-                    if (isInstanced && atomInstancedMesh && atomIdToInstanceId.has(id)) {
-                        const idx = atomIdToInstanceId.get(id);
-                        atomInstancedMesh.getMatrixAt(idx, dummy.matrix);
-                        dummy.matrix.decompose(dummy.position, dummy.quaternion, dummy.scale);
-                        pos = dummy.position.clone();
-                    } else if (atomMeshes.has(id)) {
-                        pos = atomMeshes.get(id).position.clone();
-                    }
+        if (!transformControl) return;
 
-                    if (pos) {
-                        initialAtomPositions.set(id, pos);
-                        // Store relative position in world space (for translate) and local space (for rotate/scale)
-                        const relWorld = pos.clone().sub(controlAnchor.position);
-                        threeRef.current.initialAtomPositionsRelative.set(id, relWorld);
-                        // Convert to local (relative to initial anchor quaternion)
-                        const invQ = threeRef.current.initialAnchorQuaternion.clone().invert();
-                        const relLocal = relWorld.clone().applyQuaternion(invQ);
-                        threeRef.current.initialAtomPositionsRelativeLocal.set(id, relLocal);
-                    }
-                });
-            } else {
-                // Drag End
-                controls.enabled = true;
-                const delta = new THREE.Vector3().subVectors(controlAnchor.position, dragStartPos);
-                
-                const moves = [];
-                // Compute final positions depending on transform mode
-                const mode = (threeRef.current.transformMode) || 'translate';
-                selectedAtomIds.forEach(id => {
-                    if (initialAtomPositions.has(id)) {
-                        const initPos = initialAtomPositions.get(id);
-                        let newPos = initPos.clone();
-                        if (mode === 'translate') {
-                            newPos.add(delta);
-                        } else if (mode === 'rotate') {
-                            const q1 = controlAnchor.quaternion.clone();
-                            const relLocal = threeRef.current.initialAtomPositionsRelativeLocal.get(id).clone();
-                            const relNewWorld = relLocal.applyQuaternion(q1);
-                            newPos = controlAnchor.position.clone().add(relNewWorld);
-                        } else if (mode === 'scale') {
-                            const s0 = threeRef.current.initialAnchorScale.clone();
-                            const s1 = controlAnchor.scale.clone();
-                            const scaleVec = new THREE.Vector3(s1.x / s0.x, s1.y / s0.y, s1.z / s0.z);
-                            const relLocal = threeRef.current.initialAtomPositionsRelativeLocal.get(id).clone();
-                            const relLocalScaled = new THREE.Vector3(relLocal.x * scaleVec.x, relLocal.y * scaleVec.y, relLocal.z * scaleVec.z);
-                            const relNewWorld = relLocalScaled.applyQuaternion(controlAnchor.quaternion);
-                            newPos = controlAnchor.position.clone().add(relNewWorld);
-                        }
-                        moves.push({ id, x: newPos.x, y: newPos.y, z: newPos.z });
-                    }
-                });
-                
-                if (moves.length > 0) {
-                    onAtomsMoveEnd(moves);
-                }
-                
-                setTimeout(() => {
-                    threeRef.current.isDragging = false;
-                }, DEFAULTS.INTERACTION.DRAG_DELAY);
-            }
-        };
-
-        // Real-time update during drag
-        const onChange = () => {
-            if (transformControl.dragging) {
-                const mode = (threeRef.current.transformMode) || 'translate';
-                const dummy = new THREE.Object3D();
-                
-                selectedAtomIds.forEach(id => {
-                    let newPos = null;
-                    if (initialAtomPositions.has(id)) {
-                        if (mode === 'translate') {
-                            const delta = new THREE.Vector3().subVectors(controlAnchor.position, dragStartPos);
-                            const initPos = initialAtomPositions.get(id);
-                            newPos = new THREE.Vector3().addVectors(initPos, delta);
-                        } else if (mode === 'rotate') {
-                            const q1 = controlAnchor.quaternion.clone();
-                            if (threeRef.current.initialAtomPositionsRelativeLocal.has(id)) {
-                                const relLocal = threeRef.current.initialAtomPositionsRelativeLocal.get(id).clone();
-                                const relNewWorld = relLocal.applyQuaternion(q1);
-                                newPos = controlAnchor.position.clone().add(relNewWorld);
-                            }
-                        } else if (mode === 'scale') {
-                            const s0 = threeRef.current.initialAnchorScale.clone();
-                            const s1 = controlAnchor.scale.clone();
-                            const scaleVec = new THREE.Vector3(s1.x / s0.x, s1.y / s0.y, s1.z / s0.z);
-                            if (threeRef.current.initialAtomPositionsRelativeLocal.has(id)) {
-                                const relLocal = threeRef.current.initialAtomPositionsRelativeLocal.get(id).clone();
-                                const relLocalScaled = new THREE.Vector3(relLocal.x * scaleVec.x, relLocal.y * scaleVec.y, relLocal.z * scaleVec.z);
-                                const relNewWorld = relLocalScaled.applyQuaternion(controlAnchor.quaternion);
-                                newPos = controlAnchor.position.clone().add(relNewWorld);
-                            }
-                        }
-                    }
-
-                    if (newPos) {
-                        if (isInstanced && atomInstancedMesh && atomIdToInstanceId.has(id)) {
-                            const idx = atomIdToInstanceId.get(id);
-                            atomInstancedMesh.getMatrixAt(idx, dummy.matrix);
-                            dummy.matrix.decompose(dummy.position, dummy.quaternion, dummy.scale);
-                            dummy.position.copy(newPos);
-                            dummy.updateMatrix();
-                            atomInstancedMesh.setMatrixAt(idx, dummy.matrix);
-                        } else if (atomMeshes.has(id)) {
-                            atomMeshes.get(id).position.copy(newPos);
-                        }
-                    }
-                });
-                
-                if (isInstanced && atomInstancedMesh) {
-                    atomInstancedMesh.instanceMatrix.needsUpdate = true;
-                }
-            }
-        };
+        const onDragChange = (event) => handleDraggingChanged(event, { threeRef, controls, onAtomsMoveEnd, selectedAtomIds });
+        const onChange = () => handleTransformChange({ threeRef, selectedAtomIds });
 
         transformControl.addEventListener('dragging-changed', onDragChange);
         transformControl.addEventListener('change', onChange);
-        
+
         return () => {
-            transformControl.removeEventListener('dragging-changed', onDragChange);
-            transformControl.removeEventListener('change', onChange);
+            try { transformControl.removeEventListener('dragging-changed', onDragChange); } catch (e) {}
+            try { transformControl.removeEventListener('change', onChange); } catch (e) {}
         };
     }, [onAtomsMoveEnd, selectedAtomIds]); // Re-bind when selection changes
 
-    // Update transform mode
+    // Update transform mode (delegated to helper)
     useEffect(() => {
-        const { transformControl } = threeRef.current;
-        if (transformControl && transformControl.setMode) {
-            transformControl.setMode(transformMode || 'translate');
-            threeRef.current.transformMode = transformMode;
-            if (editMode !== 'SELECT') {
-                transformControl.enabled = false;
-                try { transformControl.detach(); } catch (e) {}
-            } else {
-                transformControl.enabled = true;
-            }
-
-            // Set transform space to world for translate/scale and local for rotate
-            try {
-                if (transformMode === 'rotate') transformControl.setSpace('local');
-                else transformControl.setSpace('world');
-            } catch (e) {}
-        }
+        applyTransformMode({ threeRef, transformMode, editMode });
     }, [transformMode, editMode]);
 
 
@@ -292,78 +124,17 @@ const Viewer = () => {
 
     // Sync scene via renderer API (use renderer-specific logic instead of manual creation)
     useEffect(() => {
-        if (rendererRef.current && rendererRef.current.syncScene) {
-            try { rendererRef.current.syncScene({ atoms, lattice, layers, activeLayerId, theme }); } catch (e) {}
-        }
+        syncRendererScene(rendererRef, atoms, lattice, layers, activeLayerId, theme);
     }, [atoms, lattice, layers, theme, currentRenderer]);
 
     // Update Selection Visuals — delegate to renderer API if available
     useEffect(() => {
-        if (rendererRef.current && rendererRef.current.updateSelection) {
-            try { rendererRef.current.updateSelection(selectedAtomIds, atoms); } catch (e) {}
-        } else {
-            const { atomMeshes, atomInstancedMesh, isInstanced, atomIdToInstanceId } = threeRef.current;
-            if (isInstanced && atomInstancedMesh) {
-                visibleAtoms.forEach((atom) => {
-                    const idx = atomIdToInstanceId.get(atom.id);
-                    if (idx !== undefined) {
-                        const prop = getElementProp(atom.element);
-                        const isSelected = selectedAtomIds.includes(atom.id);
-                        const color = new THREE.Color(prop.color);
-                        if (isSelected) color.add(new THREE.Color(COLORS.selection.emissive));
-                        atomInstancedMesh.setColorAt(idx, color);
-                    }
-                });
-                if (atomInstancedMesh.instanceColor) atomInstancedMesh.instanceColor.needsUpdate = true;
-            } else {
-                atomMeshes.forEach((mesh, id) => {
-                    const isSelected = selectedAtomIds.includes(id);
-                    if (mesh.material.emissive) mesh.material.emissive.set(isSelected ? COLORS.selection.emissive : COLORS.general.black);
-                });
-            }
-        }
+        updateSelectionVisuals(rendererRef, threeRef, selectedAtomIds, atoms, currentRenderer, visibleAtoms);
     }, [selectedAtomIds, atoms, currentRenderer]);
 
-    // 处理选中逻辑和 TransformControls 绑定
+    // Handle selection centroid and TransformControls attachment
     useEffect(() => {
-        const { transformControl, atomMeshes, scene, controlAnchor, atomInstancedMesh, isInstanced, atomIdToInstanceId } = threeRef.current;
-
-        if (!transformControl) return;
-
-        if (selectedAtomIds.length > 0 && editMode === 'SELECT') {
-            // Calculate centroid (support both regular and instanced atoms)
-            const center = new THREE.Vector3();
-            let count = 0;
-            const tmp = new THREE.Object3D();
-
-            selectedAtomIds.forEach(id => {
-                if (atomMeshes.has(id)) {
-                    center.add(atomMeshes.get(id).position);
-                    count++;
-                } else if (isInstanced && atomInstancedMesh && atomIdToInstanceId.has(id)) {
-                    const idx = atomIdToInstanceId.get(id);
-                    try {
-                        atomInstancedMesh.getMatrixAt(idx, tmp.matrix);
-                        tmp.matrix.decompose(tmp.position, tmp.quaternion, tmp.scale);
-                        center.add(tmp.position);
-                        count++;
-                    } catch (e) {}
-                }
-            });
-
-            if (count > 0) {
-                center.divideScalar(count);
-                controlAnchor.position.copy(center);
-                controlAnchor.quaternion.identity();
-                controlAnchor.scale.set(1, 1, 1);
-                controlAnchor.updateMatrixWorld();
-
-                try { transformControl.attach(controlAnchor); } catch (e) {}
-                try { if (!scene.children.includes(transformControl)) scene.add(transformControl); } catch (e) {}
-            }
-        } else {
-            try { transformControl.detach(); } catch (e) {}
-        }
+        updateControlAttachment({ threeRef, selectedAtomIds, editMode, atoms });
     }, [selectedAtomIds, atoms]); // Re-attach if atoms rebuild
 
     // Update Camera Target
@@ -394,10 +165,44 @@ const Viewer = () => {
         controls.update();
     }, [lattice, atoms, layers, currentRenderer]);
 
-    // Keep lattice available to the render loop / gizmo
+    // Handle container resize (e.g., when chat panel opens/closes)
     useEffect(() => {
-        threeRef.current.lattice = lattice;
-    }, [lattice]);
+        if (!containerRef.current) return;
+        const resizeObserver = new ResizeObserver(() => {
+            if (rendererRef.current && rendererRef.current.resize) {
+                rendererRef.current.resize();
+            }
+        });
+        resizeObserver.observe(containerRef.current);
+
+        // Also react to window resize and devicePixelRatio changes (zoom)
+        const onWinResize = () => {
+            if (rendererRef.current && rendererRef.current.resize) rendererRef.current.resize();
+        };
+        window.addEventListener('resize', onWinResize);
+
+        // Some browsers don't fire resize on zoom/zoom-level changes reliably.
+        // Poll devicePixelRatio at a low frequency and trigger resize when it changes.
+        let lastDPR = window.devicePixelRatio || 1;
+        const dprInterval = setInterval(() => {
+            const dpr = window.devicePixelRatio || 1;
+            if (dpr !== lastDPR) {
+                lastDPR = dpr;
+                if (rendererRef.current && rendererRef.current.resize) rendererRef.current.resize();
+            }
+        }, 300);
+
+        // Observe body as well to catch layout changes that may not directly resize the viewer container
+        try {
+            resizeObserver.observe(document.body);
+        } catch (e) {}
+
+        return () => {
+            resizeObserver.disconnect();
+            window.removeEventListener('resize', onWinResize);
+            clearInterval(dprInterval);
+        };
+    }, []);
 
     return (
         <div ref={containerRef} className="w-full h-full relative">

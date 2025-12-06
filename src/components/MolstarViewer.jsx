@@ -124,6 +124,18 @@ export default function MolstarViewer({ pdbContent, structure, visible = true, o
         if (pluginRef.current) load();
     }, [pdbContent, structure]);
 
-    // Optionally hide by rendering null when not visible
-    return visible ? <div ref={parentRef} style={{ width: '100%', height: '100%', position: 'relative' }} /> : null;
+    // Handle container resize
+    useEffect(() => {
+        if (!parentRef.current) return;
+        const resizeObserver = new ResizeObserver(() => {
+            if (pluginRef.current && pluginRef.current.handleResize) {
+                pluginRef.current.handleResize();
+            } else if (pluginRef.current && pluginRef.current.layout) {
+                // Try to trigger layout update
+                pluginRef.current.layout.update();
+            }
+        });
+        resizeObserver.observe(parentRef.current);
+        return () => resizeObserver.disconnect();
+    }, []);
 }
