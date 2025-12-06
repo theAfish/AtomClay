@@ -68,6 +68,9 @@ export function createThreeRenderer() {
             const dirLight = new THREE.DirectionalLight(COLORS.general.white, DEFAULTS.LIGHTING.DIRECTIONAL_INTENSITY);
             dirLight.position.set(...DEFAULTS.LIGHTING.DIRECTIONAL_POSITION);
             scene.add(dirLight);
+            const dirLight2 = new THREE.DirectionalLight(COLORS.general.white, DEFAULTS.LIGHTING.DIRECTIONAL_INTENSITY * 0.5);
+            dirLight2.position.set(-10, -10, -10);
+            scene.add(dirLight2);
 
             const camera = new THREE.PerspectiveCamera(DEFAULTS.CAMERA.FOV, width/height, DEFAULTS.CAMERA.NEAR, DEFAULTS.CAMERA.FAR);
             camera.up.set(0, 0, 1);
@@ -243,7 +246,7 @@ export function createThreeRenderer() {
 
             if (isLargeSystem) {
                 const sphereGeo = new THREE.SphereGeometry(1, DEFAULTS.VISUALS.SPHERE_SEGMENTS, DEFAULTS.VISUALS.SPHERE_SEGMENTS);
-                const mat = new THREE.MeshStandardMaterial({ roughness:0.3, metalness:0.2, color: COLORS.general.white });
+                const mat = new THREE.MeshStandardMaterial({ roughness:0.1, metalness:0.1, color: COLORS.general.white });
                 const instMesh = new THREE.InstancedMesh(sphereGeo, mat, visibleAtoms.length);
                 const dummy = new THREE.Object3D();
                 visibleAtoms.forEach((atom, i) => {
@@ -263,7 +266,7 @@ export function createThreeRenderer() {
                 const sphereGeo = new THREE.SphereGeometry(1, DEFAULTS.VISUALS.SPHERE_SEGMENTS, DEFAULTS.VISUALS.SPHERE_SEGMENTS);
                 visibleAtoms.forEach(atom => {
                     const prop = getElementProp(atom.element);
-                    const mat = new THREE.MeshStandardMaterial({ color: prop.color, roughness:0.3, metalness:0.2, emissive: COLORS.general.black });
+                    const mat = new THREE.MeshStandardMaterial({ color: prop.color, roughness:0.1, metalness:0.1, emissive: COLORS.general.black });
                     const mesh = new THREE.Mesh(sphereGeo, mat);
                     mesh.position.set(atom.x, atom.y, atom.z);
                     mesh.scale.setScalar(prop.radius * DEFAULTS.VISUALS.ATOM_SCALE);
@@ -274,8 +277,9 @@ export function createThreeRenderer() {
             }
 
             // Bonds (simple instanced cylinders for small systems)
-            if (visibleAtoms.length < 500) {
-                const bondMat = new THREE.MeshStandardMaterial({color: COLORS.general.white});
+            // Only attempt naive O(N^2) bond detection for relatively small systems.
+            if (visibleAtoms.length < DEFAULTS.PERFORMANCE.BOND_MESH_THRESHOLD) {
+                const bondMat = new THREE.MeshStandardMaterial({color: COLORS.general.white, roughness:0.1, metalness:0.1});
                 const bondGeo = new THREE.CylinderGeometry(DEFAULTS.VISUALS.BOND_RADIUS, DEFAULTS.VISUALS.BOND_RADIUS, 1, DEFAULTS.VISUALS.BOND_SEGMENTS);
                 // Align geometry to Z axis (cylinder extends along Y by default in Three.js)
                 bondGeo.rotateX(Math.PI/2);

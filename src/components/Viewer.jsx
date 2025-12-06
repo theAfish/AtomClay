@@ -95,6 +95,8 @@ const Viewer = () => {
         const { transformControl, controlAnchor, atomMeshes, dragStartPos, initialAtomPositions, controls, atomInstancedMesh, isInstanced, atomIdToInstanceId } = threeRef.current;
         // Ensure we have additional tracking for rotation/scale
         if (!threeRef.current.initialAnchorQuaternion) threeRef.current.initialAnchorQuaternion = new THREE.Quaternion();
+        if (!threeRef.current.initialAnchorScale) threeRef.current.initialAnchorScale = new THREE.Vector3(1,1,1);
+        if (!threeRef.current.initialAnchorPos) threeRef.current.initialAnchorPos = new THREE.Vector3();
         if (!threeRef.current.initialAtomPositionsRelative) threeRef.current.initialAtomPositionsRelative = new Map();
         
         const onDragChange = (event) => {
@@ -105,6 +107,7 @@ const Viewer = () => {
                 dragStartPos.copy(controlAnchor.position);
                 threeRef.current.initialAnchorPos = controlAnchor.position.clone();
                 threeRef.current.initialAnchorQuaternion.copy(controlAnchor.quaternion);
+                // initialAnchorScale should always exist (initialized above), copy current scale
                 threeRef.current.initialAnchorScale.copy(controlAnchor.scale);
                 initialAtomPositions.clear();
                 threeRef.current.initialAtomPositionsRelative.clear();
@@ -323,31 +326,43 @@ const Viewer = () => {
 
     // 处理选中逻辑和 TransformControls 绑定
     useEffect(() => {
-        const { transformControl, atomMeshes, scene, controlAnchor } = threeRef.current;
-        
+        const { transformControl, atomMeshes, scene, controlAnchor, atomInstancedMesh, isInstanced, atomIdToInstanceId } = threeRef.current;
+
+        if (!transformControl) return;
+
         if (selectedAtomIds.length > 0 && editMode === 'SELECT') {
-            // Calculate centroid
+            // Calculate centroid (support both regular and instanced atoms)
             const center = new THREE.Vector3();
             let count = 0;
+            const tmp = new THREE.Object3D();
+
             selectedAtomIds.forEach(id => {
                 if (atomMeshes.has(id)) {
                     center.add(atomMeshes.get(id).position);
                     count++;
+                } else if (isInstanced && atomInstancedMesh && atomIdToInstanceId.has(id)) {
+                    const idx = atomIdToInstanceId.get(id);
+                    try {
+                        atomInstancedMesh.getMatrixAt(idx, tmp.matrix);
+                        tmp.matrix.decompose(tmp.position, tmp.quaternion, tmp.scale);
+                        center.add(tmp.position);
+                        count++;
+                    } catch (e) {}
                 }
             });
-            
+
             if (count > 0) {
                 center.divideScalar(count);
                 controlAnchor.position.copy(center);
                 controlAnchor.quaternion.identity();
                 controlAnchor.scale.set(1, 1, 1);
                 controlAnchor.updateMatrixWorld();
-                
-                transformControl.attach(controlAnchor);
-                scene.add(transformControl);
+
+                try { transformControl.attach(controlAnchor); } catch (e) {}
+                try { if (!scene.children.includes(transformControl)) scene.add(transformControl); } catch (e) {}
             }
         } else {
-            transformControl.detach();
+            try { transformControl.detach(); } catch (e) {}
         }
     }, [selectedAtomIds, atoms]); // Re-attach if atoms rebuild
 

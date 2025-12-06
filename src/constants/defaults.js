@@ -8,15 +8,15 @@ export const DEFAULTS = {
         FAR: 1000,
     },
     LIGHTING: {
-        AMBIENT_INTENSITY: 0.6,
+        AMBIENT_INTENSITY: 1.0,
         DIRECTIONAL_POSITION: [10, 10, 10],
-        DIRECTIONAL_INTENSITY: 1,
+        DIRECTIONAL_INTENSITY: 1.5,
     },
     VISUALS: {
         ATOM_SCALE: 0.4,
-        SPHERE_SEGMENTS: 24,
+        SPHERE_SEGMENTS: 32,
         BOND_RADIUS: 0.1,
-        BOND_SEGMENTS: 6,
+        BOND_SEGMENTS: 12,
         BOND_THRESHOLD_FACTOR: 0.6,
     },
     INTERACTION: {
@@ -25,6 +25,7 @@ export const DEFAULTS = {
     },
     PERFORMANCE: {
         INSTANCED_MESH_THRESHOLD: 10000,
+        BOND_MESH_THRESHOLD: 500, // max atoms to attempt naive bond generation
     },
     HISTORY: {
         MAX_LENGTH: 100,
