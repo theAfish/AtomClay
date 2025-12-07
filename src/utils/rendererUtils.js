@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { createThreeRenderer, createCustomRenderer } from '../renderers';
 
-export const initializeRenderer = (containerRef, currentRenderer, onAtomClick, onAtomsMoveEnd, onBoxSelect, theme, lattice, drawGizmoRef, latestProps, atoms, layers, activeLayerId, rendererRef, threeRef) => {
+export const initializeRenderer = (containerRef, currentRenderer, onAtomClick, onAtomsMoveEnd, onBoxSelect, theme, lattice, drawGizmoRef, latestProps, atoms, layers, activeLayerId, rendererRef, threeRef, transformMode = 'translate', editMode = 'SELECT') => {
     if (!containerRef.current) return;
     // Capture previous camera/controls state so we can preserve viewport when
     // switching renderers. This avoids jumps when swapping implementations.
@@ -60,6 +60,13 @@ export const initializeRenderer = (containerRef, currentRenderer, onAtomClick, o
 
     // Sync initial scene to renderer
     try { if (rendererApi.syncScene) rendererApi.syncScene({ atoms, lattice, layers, activeLayerId, theme }); } catch(e) {}
+
+    // Configure transform controls to match current UI state
+    try {
+        if (typeof rendererApi.setTransformMode === 'function') {
+            rendererApi.setTransformMode(transformMode, editMode);
+        }
+    } catch (e) {}
 
     return () => {
         try { rendererApi.dispose(); } catch (e) {}

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Scissors, MousePointer2, Trash2, Move, RotateCw, Maximize2, Layers } from 'lucide-react';
+import { Scissors, MousePointer2, PlusSquare, Trash2, Move, RotateCw, Maximize2, Layers } from 'lucide-react';
 import { ELEMENT_DATA } from '../constants/elements';
 import { useTranslation } from 'react-i18next';
 import { useMolecularContext } from '../context/MolecularContext';
@@ -15,6 +15,7 @@ const RightPanel = () => {
         targetElement, setTargetElement,
         transformMode, setTransformMode,
         updateAtoms,
+        createAtomAtCenter,
         theme,
         // Layers-related state moved from LeftPanel
         layers, setLayers, activeLayerId, setActiveLayerId, setLattice, renameLayer, lattice,
@@ -55,8 +56,8 @@ const RightPanel = () => {
                     <button onClick={()=>setEditMode('SELECT')} className={`flex-1 py-2 rounded text-xs flex flex-col items-center gap-1 ${editMode==='SELECT'?buttonPrimary:textMuted}`}>
                         <MousePointer2 size={14} /> {t('Select/Move')}
                     </button>
-                    <button onClick={()=>setEditMode('DELETE')} className={`flex-1 py-2 rounded text-xs flex flex-col items-center gap-1 ${editMode==='DELETE'?buttonDanger:textMuted}`}>
-                        <Trash2 size={14} /> {t('Delete Mode')}
+                    <button onClick={()=>createAtomAtCenter()} className={`flex-1 py-2 rounded text-xs flex flex-col items-center gap-1 ${textMuted}`}>
+                        <PlusSquare size={14} /> {t('Add Atom')}
                     </button>
                 </div>
 
@@ -110,7 +111,8 @@ const RightPanel = () => {
                     </div>
                 ) : (
                     <div className={`text-xs text-center py-4 italic ${textMuted}`}>
-                        {editMode==='SELECT' ? t('Select Instruction', { mode: t(transformMode.charAt(0).toUpperCase() + transformMode.slice(1)) }) : t('Delete Instruction')}
+                        {t('Select Instruction', { mode: t(transformMode.charAt(0).toUpperCase() + transformMode.slice(1)) })}
+                        <div className="mt-2 text-[11px]">{t('Use the Add Atom button to insert a new atom at the cell center.')}</div>
                     </div>
                 )}
             </div>

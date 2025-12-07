@@ -62,7 +62,7 @@ const Viewer = () => {
 
     // Initialize renderer (three-based) and wire up callbacks (re-init when `currentRenderer` changes)
     useEffect(() => {
-        return initializeRenderer(containerRef, currentRenderer, onAtomClick, onAtomsMoveEnd, onBoxSelect, theme, lattice, drawGizmoRef, latestProps, atoms, layers, activeLayerId, rendererRef, threeRef);
+        return initializeRenderer(containerRef, currentRenderer, onAtomClick, onAtomsMoveEnd, onBoxSelect, theme, lattice, drawGizmoRef, latestProps, atoms, layers, activeLayerId, rendererRef, threeRef, transformMode, editMode);
     }, [currentRenderer]); // Re-init when renderer changes
 
 

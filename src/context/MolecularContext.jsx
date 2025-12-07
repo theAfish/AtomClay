@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useMolecularState } from '../hooks/useMolecularState';
 import { MathUtils } from '../utils/math';
 import { parse } from '../utils/parsers';
+import { createAtomHandlers } from './atomHandlers';
 
 const MolecularContext = createContext(null);
 
@@ -227,44 +228,16 @@ export const MolecularProvider = ({ children }) => {
         }
     };
 
-    const onAtomClick = useCallback((id, isMulti) => {
-        if(editMode === 'DELETE' && id !== null) {
-            updateAtoms(prev => prev.filter(a => a.id !== id));
-            setSelectedAtomIds(prev => prev.filter(i => i !== id));
-        } else {
-            if (id === null) {
-                if (!isMulti) setSelectedAtomIds([]);
-            } else {
-                if (isMulti) {
-                    setSelectedAtomIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
-                } else {
-                    setSelectedAtomIds([id]);
-                }
-            }
-        }
-    }, [editMode, updateAtoms]);
-
-    const onBoxSelect = useCallback((ids, isMulti) => {
-        if (isMulti) {
-            // Merge unique
-            setSelectedAtomIds(prev => [...new Set([...prev, ...ids])]);
-        } else {
-            setSelectedAtomIds(ids);
-        }
-    }, []);
-
-    const onAtomsMoveEnd = useCallback((moves) => {
-        updateAtoms(prev => {
-            const moveMap = new Map(moves.map(m => [m.id, m]));
-            return prev.map(a => {
-                if (moveMap.has(a.id)) {
-                    const m = moveMap.get(a.id);
-                    return { ...a, x: m.x, y: m.y, z: m.z };
-                }
-                return a;
-            });
-        });
-    }, [updateAtoms]);
+    // Atom-related handlers moved to separate module for readability
+    const { onAtomClick, onBoxSelect, onAtomsMoveEnd, createAtomAtCenter } = createAtomHandlers({
+        lattice,
+        updateAtoms,
+        targetElement,
+        setSelectedAtomIds,
+        setEditMode,
+        setTransformMode,
+        activeLayerId
+    });
 
     const handleDragOver = (e) => {
         e.preventDefault();
@@ -289,6 +262,8 @@ export const MolecularProvider = ({ children }) => {
         i18n.changeLanguage(code);
         setShowLangDropdown(false);
     };
+
+    // createAtomAtCenter provided by atomHandlers
 
     const renderers = [
         { id: 'three', label: 'Three.js' },
@@ -330,6 +305,7 @@ export const MolecularProvider = ({ children }) => {
         handleVacuum,
         handleScaleLattice,
         handleSetLattice,
+        createAtomAtCenter,
         onAtomClick,
         onBoxSelect,
         onAtomsMoveEnd,

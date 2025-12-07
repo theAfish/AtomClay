@@ -4,6 +4,8 @@ import { useTranslation } from 'react-i18next';
 import { useMolecularContext } from '../context/MolecularContext';
 import { PANEL_CLASSES } from '../constants/theme';
 
+//    DEBUG INFO:   这里后续接入后端需要重点调整！！！！！！！！！
+
 const ChatPanel = ({ isOpen, onToggle }) => {
     const { t } = useTranslation();
     const { theme } = useMolecularContext();
@@ -11,6 +13,7 @@ const ChatPanel = ({ isOpen, onToggle }) => {
         { id: 1, text: 'Hello! I\'m your AI assistant. How can I help you with your molecular structures today?', sender: 'agent', timestamp: new Date() }
     ]);
     const [inputMessage, setInputMessage] = useState('');
+    const [isSending, setIsSending] = useState(false);
 
     const isDark = theme === 'dark';
     const panels = PANEL_CLASSES[theme] || PANEL_CLASSES.dark;
@@ -21,31 +24,87 @@ const ChatPanel = ({ isOpen, onToggle }) => {
     const borderClass = panels.borderClass;
     const buttonPrimary = panels.buttonPrimary;
 
-    const handleSendMessage = () => {
-        if (inputMessage.trim()) {
-            const newMessage = {
-                id: messages.length + 1,
-                text: inputMessage,
-                sender: 'user',
+    const handleSendMessage = async () => {
+        const trimmed = inputMessage.trim();
+        if (!trimmed || isSending) return;
+
+        const userMessage = {
+            id: messages.length + 1,
+            text: trimmed,
+            sender: 'user',
+            timestamp: new Date()
+        };
+        setMessages(prev => [...prev, userMessage]);
+        setInputMessage('');
+
+        setIsSending(true);
+        try {
+            // POST to relative `/run` so Vite dev server proxy can forward to backend.
+            const resp = await fetch('/run', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    // match the shape in _debug/payload.json — change these defaults as needed
+                    appName: 'my_agent',
+                    userId: 'u_123',
+                    sessionId: 's_123',
+                    newMessage: {
+                        role: 'user',
+                        parts: [
+                            { text: trimmed }
+                        ]
+                    }
+                })
+            });
+
+            if (!resp.ok) {
+                throw new Error(`Server returned ${resp.status}`);
+            }
+
+            const data = await resp.json();
+
+            // Server examples show an array of responses; try to extract a sensible text.
+            let agentText = '';
+            if (Array.isArray(data) && data.length > 0) {
+                const first = data[0];
+                if (first?.content?.parts && first.content.parts.length > 0) {
+                    agentText = first.content.parts.map(p => p.text).join('\n');
+                } else if (first?.text) {
+                    agentText = first.text;
+                } else {
+                    agentText = JSON.stringify(first);
+                }
+            } else if (data?.content?.parts) {
+                agentText = data.content.parts.map(p => p.text).join('\n');
+            } else if (typeof data === 'string') {
+                agentText = data;
+            } else {
+                agentText = 'No response text found from server.';
+            }
+
+            const agentResponse = {
+                id: messages.length + 2,
+                text: agentText,
+                sender: 'agent',
                 timestamp: new Date()
             };
-            setMessages(prev => [...prev, newMessage]);
-            setInputMessage('');
-
-            // Simulate agent response (for now)
-            setTimeout(() => {
-                const agentResponse = {
-                    id: messages.length + 2,
-                    text: 'I understand you\'re working on molecular structures. This feature is coming soon!',
-                    sender: 'agent',
-                    timestamp: new Date()
-                };
-                setMessages(prev => [...prev, agentResponse]);
-            }, 1000);
+            setMessages(prev => [...prev, agentResponse]);
+        } catch (err) {
+            const errMessage = {
+                id: messages.length + 2,
+                text: `Error contacting server: ${err.message}`,
+                sender: 'agent',
+                timestamp: new Date()
+            };
+            setMessages(prev => [...prev, errMessage]);
+        } finally {
+            setIsSending(false);
         }
     };
 
-    const handleKeyPress = (e) => {
+    const handleKeyDown = (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             handleSendMessage();
@@ -112,18 +171,18 @@ const ChatPanel = ({ isOpen, onToggle }) => {
                                 type="text"
                                 value={inputMessage}
                                 onChange={(e) => setInputMessage(e.target.value)}
-                                onKeyPress={handleKeyPress}
+                                onKeyDown={handleKeyDown}
                                 placeholder={t('Type your message...')}
                                 className={`flex-1 px-3 py-2 rounded-lg ${bgInput} ${borderClass} ${textPrimary} placeholder-${textSecondary} focus:outline-none focus:ring-2 focus:ring-blue-500`}
                             />
-                            <button
-                                onClick={handleSendMessage}
-                                disabled={!inputMessage.trim()}
-                                className={`${buttonPrimary} p-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed`}
-                                title={t('Send Message')}
-                            >
-                                <Send size={18} />
-                            </button>
+                                            <button
+                                                onClick={handleSendMessage}
+                                                disabled={!inputMessage.trim() || isSending}
+                                                className={`${buttonPrimary} p-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed`}
+                                                title={t('Send Message')}
+                                            >
+                                                <Send size={18} />
+                                            </button>
                         </div>
                     </div>
                 </div>
