@@ -47,7 +47,7 @@ const ChatPanel = ({ isOpen, onToggle }) => {
                 },
                 body: JSON.stringify({
                     // match the shape in _debug/payload.json — change these defaults as needed
-                    appName: 'my_agent',
+                    appName: 'agentom',
                     userId: 'u_123',
                     sessionId: 's_123',
                     newMessage: {
