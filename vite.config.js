@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-//  DEBUG INFO:   这里后续接入后端需要重点调整！！！！！！
+// Proxy API requests to the backend middle-layer
 
 // https://vitejs.dev/config/
 export default defineConfig(({ command }) => {
@@ -11,12 +11,17 @@ export default defineConfig(({ command }) => {
     server: {
       proxy: {
         '/run': {
-          target: 'http://localhost:8000',
+          target: 'http://localhost:3000',
           changeOrigin: true,
           secure: false,
         },
         '/apps': {
-          target: 'http://localhost:8000',
+          target: 'http://localhost:3000',
+          changeOrigin: true,
+          secure: false,
+        },
+        '/logs': {
+          target: 'http://localhost:3000',
           changeOrigin: true,
           secure: false,
         }
