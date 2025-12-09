@@ -68,13 +68,13 @@ const buildStructurePayload = ({ atoms, lattice, layers, activeLayerId, sessionI
     const poscar = buildPoscar(atomsForVisible, latticeForStructure);
     if (!poscar) return null;
 
-    const nameParts = allLayers
-        .filter(l => l && visibleLayerIds.has(l.id))
-        .map(l => l.name || l.id || '')
-        .filter(Boolean);
-    const baseName = nameParts.length ? nameParts.join('_') : 'merged_visible';
-    const safeName = baseName.replace(/[^\w.-]+/g, '_') || 'merged_visible';
-    const fileName = `${safeName}_${sessionId || 'session'}.vasp`;
+    // const nameParts = allLayers
+    //     .filter(l => l && visibleLayerIds.has(l.id))
+    //     .map(l => l.name || l.id || '')
+    //     .filter(Boolean);
+    // const baseName = nameParts.length ? nameParts.join('_') : 'merged_visible';
+    // const safeName = baseName.replace(/[^\w.-]+/g, '_') || 'merged_visible';
+    const fileName = `${sessionId || 'session'}.vasp`;
 
     return {
         fileName,
@@ -88,7 +88,7 @@ const buildStructurePayload = ({ atoms, lattice, layers, activeLayerId, sessionI
 
 const ChatPanel = ({ isOpen, onToggle }) => {
     const { t } = useTranslation();
-    const { theme, atoms, lattice, layers, activeLayerId } = useMolecularContext();
+    const { theme, atoms, lattice, layers, activeLayerId, loadStructureFromText } = useMolecularContext();
     const [messages, setMessages] = useState([
         { id: 1, text: 'Hello! I\'m your AI assistant. How can I help you with your structures today?', sender: 'agent', timestamp: new Date(), type: 'response', author: 'agentom' }
     ]);
@@ -354,6 +354,22 @@ const ChatPanel = ({ isOpen, onToggle }) => {
             setStatusMessage('');
             if (logSource) {
                 logSource.close();
+            }
+            // After the agent run, try to load the final structure into a new layer
+            try {
+                console.log('Fetching final structure...');
+                const structureResp = await fetch('/get_final_structure');
+                console.log('Structure response status:', structureResp.status);
+                if (structureResp.ok) {
+                    const structureData = await structureResp.json();
+                    console.log('Structure data:', structureData);
+                    await loadStructureFromText(structureData.content, structureData.format, structureData.fileName);
+                    console.log('Structure loaded successfully');
+                } else {
+                    console.log('No structure found or error:', await structureResp.text());
+                }
+            } catch (e) {
+                console.error('Failed to load final structure:', e);
             }
         }
     };

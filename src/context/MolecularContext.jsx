@@ -161,6 +161,21 @@ export const MolecularProvider = ({ children }) => {
         setSelectedAtomIds(newIds);
     };
 
+    const loadStructureFromText = async (content, format, fileName) => {
+        try {
+            console.log('Parsing structure:', format, fileName);
+            const { atoms: newAtoms, lattice: newLat } = await parse(content, format);
+            console.log('Parsed atoms:', newAtoms.length, 'lattice:', newLat);
+            const newIds = addAtoms(newAtoms, newLat, true); // Always create new layer
+            setSelectedAtomIds(newIds);
+            setFileError(null);
+            console.log('Structure loaded into new layer');
+        } catch (e) {
+            console.error('Error loading structure:', e);
+            setFileError(e.message);
+        }
+    };
+
     const handleLoad = async (e) => {
         const file = e.target.files[0];
         if(!file) return;
@@ -311,9 +326,10 @@ export const MolecularProvider = ({ children }) => {
         onAtomsMoveEnd,
         handleDragOver,
         handleDrop,
-        changeLanguage
-        , renameLayer
-        , // Renderer API
+        changeLanguage,
+        renameLayer,
+        loadStructureFromText,
+        // Renderer API
         currentRenderer, setCurrentRenderer, renderers, showRendererDropdown, setShowRendererDropdown, changeRenderer
     };
 
