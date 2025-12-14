@@ -4,33 +4,11 @@ import { createPluginUI } from 'molstar/lib/mol-plugin-ui/index';
 import { renderReact18 } from 'molstar/lib/mol-plugin-ui/react18';
 import 'molstar/lib/mol-plugin-ui/skin/light.scss';
 import { COLORS } from '../constants/theme';
+import { toPDB } from '../utils/parsers/pdbParser';
 
 export default function MolstarViewer({ pdbContent, structure, visible = true, onClose, theme = 'dark' }) {
     const parentRef = useRef(null);
     const pluginRef = useRef(null);
-
-    // Convert normalized structure to a minimal PDB string Mol* can parse
-    const structureToPDB = (s) => {
-        if (!s || !Array.isArray(s.atoms)) return null;
-        const lines = [];
-        let idx = 1;
-        for (const a of s.atoms) {
-            const el = (a.element || 'X').toUpperCase().slice(0,2).padStart(2, ' ');
-            const serial = String(idx).padStart(5, ' ');
-            const name = el.padEnd(4, ' ');
-            const resName = 'UNK';
-            const chain = 'A';
-            const resSeq = '1'.padStart(4, ' ');
-            const x = (a.x || 0).toFixed(3).toString().padStart(8, ' ');
-            const y = (a.y || 0).toFixed(3).toString().padStart(8, ' ');
-            const z = (a.z || 0).toFixed(3).toString().padStart(8, ' ');
-            const line = `ATOM  ${serial} ${name}${resName} ${chain}${resSeq}   ${x}${y}${z}  1.00  0.00          ${el}`;
-            lines.push(line);
-            idx++;
-        }
-        lines.push('END');
-        return lines.join('\n');
-    };
 
     useEffect(() => {
         if (pluginRef.current) {
@@ -80,7 +58,7 @@ export default function MolstarViewer({ pdbContent, structure, visible = true, o
                     parentRef.current.style.backgroundColor = theme === 'dark' ? COLORS.background.dark : COLORS.background.light;
                     
                     let input = pdbContent;
-                    if (!input && structure) input = structureToPDB(structure);
+                    if (!input && structure) input = toPDB(structure);
                     if (input) {
                         const data = await plugin.builders.data.rawData({ data: input, label: 'Structure' });
                         const fmt = 'pdb';
@@ -109,7 +87,7 @@ export default function MolstarViewer({ pdbContent, structure, visible = true, o
         async function load() {
             if (!pluginRef.current) return;
             let input = pdbContent;
-            if (!input && structure) input = structureToPDB(structure);
+            if (!input && structure) input = toPDB(structure);
             if (!input) return;
             try {
                 pluginRef.current.clear();

@@ -55,11 +55,12 @@ export function detectFormat(text = '', filename = '') {
  * Parses the file content using the appropriate parser.
  * @param {string} text - The file content.
  * @param {string} [format] - The format to use (optional, will be detected if not provided).
+ * @param {string} [filename] - The file name (optional, used for detection).
  * @returns {Promise<{atoms: Array, lattice: Array|null, metadata: Object}>} The parsed structure.
  * @throws {Error} If no parser is found for the format.
  */
-export async function parse(text, format) {
-    const fmt = format || detectFormat(text);
+export async function parse(text, format, filename) {
+    const fmt = format || detectFormat(text, filename);
     const parser = getParser(fmt);
     if (!parser || typeof parser.parse !== 'function') {
         throw new Error(`No parser registered for format: ${fmt}`);

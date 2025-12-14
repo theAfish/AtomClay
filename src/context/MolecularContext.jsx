@@ -161,10 +161,10 @@ export const MolecularProvider = ({ children }) => {
         setSelectedAtomIds(newIds);
     };
 
-    const loadStructureFromText = async (content, format, fileName) => {
+    const loadStructureFromText = async (content, fileName) => {
         try {
-            console.log('Parsing structure:', format, fileName);
-            const { atoms: newAtoms, lattice: newLat } = await parse(content, format);
+            console.log('Parsing structure:', fileName);
+            const { atoms: newAtoms, lattice: newLat } = await parse(content, undefined, fileName);
             console.log('Parsed atoms:', newAtoms.length, 'lattice:', newLat);
             const newIds = addAtoms(newAtoms, newLat, true); // Always create new layer
             setSelectedAtomIds(newIds);
