@@ -366,6 +366,31 @@ export const MolecularProvider = ({ children }) => {
         setAgentReviewState({ status: 'idle', originalLayers: [], resultLayerId: null });
     };
 
+    const handleLayerReviewAction = (layerId, action) => {
+        setLayers(prev => {
+            const nextLayers = prev.map(l => {
+                if (l.id !== layerId) return l;
+                
+                if (action === 'keep') {
+                    // Remove flags, ensure visibility
+                    const { isAgentInput, isAgentResult, visible, ...rest } = l;
+                    return { ...rest, visible: true };
+                } else if (action === 'discard') {
+                    return null; // Will filter out
+                }
+                return l;
+            }).filter(Boolean);
+
+            // Check if any flagged layers remain
+            const hasFlagged = nextLayers.some(l => l.isAgentInput || l.isAgentResult);
+            if (!hasFlagged) {
+                setAgentReviewState({ status: 'idle', originalLayers: [], resultLayerId: null });
+            }
+
+            return nextLayers;
+        });
+    };
+
     // Initial Load
     useEffect(() => {
         // Start empty; keep the default lattice from initial state (10x10x10)
@@ -409,6 +434,7 @@ export const MolecularProvider = ({ children }) => {
         handleAgentResult,
         acceptAgentResult,
         denyAgentResult,
+        handleLayerReviewAction,
         // Renderer API
         currentRenderer, setCurrentRenderer, renderers, showRendererDropdown, setShowRendererDropdown, changeRenderer
     };

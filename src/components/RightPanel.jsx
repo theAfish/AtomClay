@@ -21,7 +21,7 @@ const RightPanel = () => {
         layers, setLayers, activeLayerId, setActiveLayerId, setLattice, renameLayer, lattice,
         saveStateToHistory, currentLatticeSourceId,
         isChatOpen,
-        agentReviewState, acceptAgentResult, denyAgentResult
+        agentReviewState, acceptAgentResult, denyAgentResult, handleLayerReviewAction
     } = useMolecularContext();
 
     const selectedCount = selectedAtomIds.length;
@@ -149,6 +149,7 @@ const RightPanel = () => {
                         saveStateToHistory={saveStateToHistory}
                         atoms={atoms}
                         currentLatticeSourceId={currentLatticeSourceId}
+                        handleLayerReviewAction={handleLayerReviewAction}
                     />
                 </div>
             </div>
