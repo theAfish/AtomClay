@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Scissors, MousePointer2, PlusSquare, Trash2, Move, RotateCw, Maximize2, Layers } from 'lucide-react';
+import { Scissors, MousePointer2, PlusSquare, Trash2, Move, RotateCw, Maximize2, Layers, Check, X } from 'lucide-react';
 import { ELEMENT_DATA } from '../constants/elements';
 import { useTranslation } from 'react-i18next';
 import { useMolecularContext } from '../context/MolecularContext';
@@ -19,7 +19,9 @@ const RightPanel = () => {
         theme,
         // Layers-related state moved from LeftPanel
         layers, setLayers, activeLayerId, setActiveLayerId, setLattice, renameLayer, lattice,
-        isChatOpen
+        saveStateToHistory, currentLatticeSourceId,
+        isChatOpen,
+        agentReviewState, acceptAgentResult, denyAgentResult
     } = useMolecularContext();
 
     const selectedCount = selectedAtomIds.length;
@@ -119,9 +121,21 @@ const RightPanel = () => {
 
             {/* Layers UI moved here from LeftPanel (refactored to reusable component) */}
             <div className={`${panelClass} p-4 rounded-xl shadow-xl pointer-events-auto mt-4`}>
-                <h2 className={`text-sm font-bold mb-3 flex items-center gap-2 ${textPrimary}`}>
-                    <Layers size={16} /> {t('Layers')}
-                </h2>
+                <div className="flex items-center justify-between mb-3">
+                    <h2 className={`text-sm font-bold flex items-center gap-2 ${textPrimary}`}>
+                        <Layers size={16} /> {t('Layers')}
+                    </h2>
+                    {agentReviewState && agentReviewState.status === 'reviewing' && (
+                        <div className="flex gap-1">
+                            <button onClick={acceptAgentResult} className="bg-green-600 hover:bg-green-700 text-white p-1 rounded" title="Accept Agent Result">
+                                <Check size={14} />
+                            </button>
+                            <button onClick={denyAgentResult} className="bg-red-600 hover:bg-red-700 text-white p-1 rounded" title="Deny Agent Result">
+                                <X size={14} />
+                            </button>
+                        </div>
+                    )}
+                </div>
                 <div className="space-y-2">
                     <LayersList
                         layers={layers}
@@ -132,6 +146,9 @@ const RightPanel = () => {
                         setLayers={setLayers}
                         renameLayer={renameLayer}
                         lattice={lattice}
+                        saveStateToHistory={saveStateToHistory}
+                        atoms={atoms}
+                        currentLatticeSourceId={currentLatticeSourceId}
                     />
                 </div>
             </div>

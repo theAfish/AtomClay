@@ -6,7 +6,7 @@ import { handleSupercell as doSupercell, handleVacuum as doVacuum, handleScaleLa
 
 export function useMolecularState() {
     // Layers State
-    const [layers, setLayers] = useState([{ id: 'layer-0', name: 'Layer 1', visible: true, opacity: 1, lattice: DEFAULTS.LATTICE }]);
+    const [layers, setLayers] = useState([{ id: 'layer-0', name: 'Layer 1', visible: true, selected: true, opacity: 1, lattice: DEFAULTS.LATTICE }]);
     const [activeLayerId, setActiveLayerId] = useState('layer-0');
     const [atoms, setAtoms] = useState([]);
 
@@ -15,18 +15,18 @@ export function useMolecularState() {
     const [currentLatticeSourceId, setCurrentLatticeSourceId] = useState('layer-0');
     const lattice = currentLattice;
 
-    const setLattice = useCallback((newLattice, sourceId = null) => {
-        setCurrentLattice(newLattice);
-        if (sourceId) setCurrentLatticeSourceId(sourceId);
-    }, []);
-
     // Undo history: stack of { atoms, layers, lattice, activeLayerId, latticeSourceId }
     const historyRef = useRef([]);
+    const redoStackRef = useRef([]);
     const isUndoingRef = useRef(false);
     const MAX_HISTORY = DEFAULTS.HISTORY.MAX_LENGTH;
 
     const saveStateToHistory = useCallback((prevAtoms, prevLattice, prevLayers, prevActiveId, prevSourceId) => {
         if (isUndoingRef.current) return;
+        
+        // Clear redo stack when a new action is performed
+        redoStackRef.current = [];
+
         const snap = {
             atoms: prevAtoms ? prevAtoms.map(a => ({ ...a })) : [],
             layers: prevLayers ? JSON.parse(JSON.stringify(prevLayers)) : [],
@@ -41,6 +41,17 @@ export function useMolecularState() {
     const undo = useCallback(() => {
         const h = historyRef.current;
         if (!h || h.length === 0) return;
+
+        // Save current state to Redo
+        const currentSnap = {
+            atoms: atoms ? atoms.map(a => ({ ...a })) : [],
+            layers: layers ? JSON.parse(JSON.stringify(layers)) : [],
+            lattice: lattice,
+            activeLayerId: activeLayerId,
+            latticeSourceId: currentLatticeSourceId
+        };
+        redoStackRef.current.push(currentSnap);
+
         const last = h.pop();
         isUndoingRef.current = true;
         setAtoms(last.atoms || []);
@@ -51,19 +62,59 @@ export function useMolecularState() {
         
         // allow state push suppression to end on next tick
         setTimeout(() => { isUndoingRef.current = false; }, 0);
-    }, []);
+    }, [atoms, layers, lattice, activeLayerId, currentLatticeSourceId]);
 
-    // Keyboard handler for Ctrl+Z
+    const redo = useCallback(() => {
+        const r = redoStackRef.current;
+        if (!r || r.length === 0) return;
+
+        // Save current state to History
+        const currentSnap = {
+            atoms: atoms ? atoms.map(a => ({ ...a })) : [],
+            layers: layers ? JSON.parse(JSON.stringify(layers)) : [],
+            lattice: lattice,
+            activeLayerId: activeLayerId,
+            latticeSourceId: currentLatticeSourceId
+        };
+        historyRef.current.push(currentSnap);
+
+        const next = r.pop();
+        isUndoingRef.current = true;
+        setAtoms(next.atoms || []);
+        if (next.layers) setLayers(next.layers);
+        if (next.lattice !== undefined) setCurrentLattice(next.lattice);
+        if (next.activeLayerId) setActiveLayerId(next.activeLayerId);
+        if (next.latticeSourceId) setCurrentLatticeSourceId(next.latticeSourceId);
+        
+        setTimeout(() => { isUndoingRef.current = false; }, 0);
+    }, [atoms, layers, lattice, activeLayerId, currentLatticeSourceId]);
+
+    // Keyboard handler for Ctrl+Z and Ctrl+Y (or Ctrl+Shift+Z)
     useEffect(() => {
         const handler = (e) => {
-            if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
-                e.preventDefault();
-                undo();
+            if (e.ctrlKey || e.metaKey) {
+                if (e.key === 'z' || e.key === 'Z') {
+                    e.preventDefault();
+                    if (e.shiftKey) {
+                        redo();
+                    } else {
+                        undo();
+                    }
+                } else if (e.key === 'y' || e.key === 'Y') {
+                    e.preventDefault();
+                    redo();
+                }
             }
         };
         window.addEventListener('keydown', handler);
         return () => window.removeEventListener('keydown', handler);
-    }, [undo]);
+    }, [undo, redo]);
+
+    const setLattice = useCallback((newLattice, sourceId = null) => {
+        saveStateToHistory(atoms, lattice, layers, activeLayerId, currentLatticeSourceId);
+        setCurrentLattice(newLattice);
+        if (sourceId) setCurrentLatticeSourceId(sourceId);
+    }, [atoms, lattice, layers, activeLayerId, currentLatticeSourceId, saveStateToHistory]);
 
     // Operations
 
@@ -124,7 +175,9 @@ export function useMolecularState() {
             }
         }
         
-        return mapped.map(m => m.id); // Return new IDs for selection
+        const resultIds = mapped.map(m => m.id);
+        resultIds.layerId = targetLayerId;
+        return resultIds; // Return new IDs for selection
     }, [atoms, lattice, layers, activeLayerId, saveStateToHistory, currentLatticeSourceId]);
 
     const updateAtoms = useCallback((updater) => {
@@ -151,6 +204,7 @@ export function useMolecularState() {
         setLayers,
         setActiveLayerId,
         undo,
+        redo,
         handleSupercell,
         handleVacuum,
         handleScaleLattice,
@@ -158,6 +212,7 @@ export function useMolecularState() {
         addAtoms,
         updateAtoms,
         renameLayer,
-        saveStateToHistory
+        saveStateToHistory,
+        currentLatticeSourceId
     };
 }

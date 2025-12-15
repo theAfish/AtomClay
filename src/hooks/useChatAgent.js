@@ -5,7 +5,7 @@ import { CHAT_CONSTANTS } from '../constants/chatConstants';
 import { runAgent, getFinalStructure } from '../services/api';
 
 export const useChatAgent = () => {
-    const { atoms, lattice, layers, activeLayerId, loadStructureFromText } = useMolecularContext();
+    const { atoms, lattice, layers, activeLayerId, loadStructureFromText, handleAgentResult } = useMolecularContext();
     const [messages, setMessages] = useState([
         { 
             id: 1, 
@@ -270,7 +270,7 @@ export const useChatAgent = () => {
                 if (structureResp.ok) {
                     const structureData = await structureResp.json();
                     console.log('Structure data:', structureData);
-                    await loadStructureFromText(structureData.content, structureData.fileName);
+                    await handleAgentResult(structureData.content, structureData.fileName);
                     console.log('Structure loaded successfully');
                 } else {
                     console.log('No structure found or error:', await structureResp.text());

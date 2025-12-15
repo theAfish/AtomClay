@@ -70,19 +70,19 @@ export const buildStructurePayload = ({ atoms, lattice, layers, activeLayerId, s
     if (isInitialEmptyStructure(layers, atoms)) return null;
 
     const allLayers = layers || [];
-    const visibleLayerIds = new Set(
-        allLayers.filter(l => l && l.visible !== false).map(l => l.id)
+    // Use selected property if available, otherwise fallback to visible (for backward compatibility)
+    const targetLayerIds = new Set(
+        allLayers.filter(l => (l.selected !== undefined ? l.selected : l.visible)).map(l => l.id)
     );
 
-    const atomsForVisible = (atoms || []).filter(a => {
-        if (!visibleLayerIds.size) return true; // if nothing flagged, include all
-        return visibleLayerIds.has(a.layerId || activeLayerId || 'layer-0');
+    const atomsForTarget = (atoms || []).filter(a => {
+        return targetLayerIds.has(a.layerId || activeLayerId || 'layer-0');
     });
 
-    if (!atomsForVisible || atomsForVisible.length === 0) return null;
+    if (!atomsForTarget || atomsForTarget.length === 0) return null;
 
     const latticeForStructure = lattice;
-    const poscar = buildPoscar(atomsForVisible, latticeForStructure);
+    const poscar = buildPoscar(atomsForTarget, latticeForStructure);
     if (!poscar) return null;
 
     const fileName = `${sessionId || 'session'}.poscar`;
@@ -91,6 +91,6 @@ export const buildStructurePayload = ({ atoms, lattice, layers, activeLayerId, s
         fileName,
         content: poscar,
         layerId: null,
-        atomCount: atomsForVisible.length
+        atomCount: atomsForTarget.length
     };
 };

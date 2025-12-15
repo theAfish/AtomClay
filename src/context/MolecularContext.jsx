@@ -30,6 +30,7 @@ export const MolecularProvider = ({ children }) => {
         setLayers,
         setActiveLayerId,
         undo,
+        redo,
         handleSupercell: handleSupercellOp,
         handleVacuum: handleVacuumOp,
         handleScaleLattice: handleScaleLatticeOp,
@@ -184,6 +185,9 @@ export const MolecularProvider = ({ children }) => {
             await importFile(file, false);
         } catch (e) {
             setFileError(e.message);
+        } finally {
+            // Reset input value to allow reloading the same file
+            e.target.value = '';
         }
     };
 
@@ -291,6 +295,77 @@ export const MolecularProvider = ({ children }) => {
         setShowRendererDropdown(false);
     };
 
+    // Agent Review State
+    const [agentReviewState, setAgentReviewState] = useState({ status: 'idle', originalLayers: [], resultLayerId: null });
+
+    const handleAgentResult = async (content, fileName) => {
+        // 1. Identify selected layers (sent to agent)
+        const selectedLayers = layers.filter(l => l.selected);
+        const selectedLayerIds = selectedLayers.map(l => l.id);
+
+        // 2. Mark them as red (custom property) and invisible
+        setLayers(prev => prev.map(l => {
+            if (selectedLayerIds.includes(l.id)) {
+                return { ...l, visible: false, isAgentInput: true }; // isAgentInput -> Red
+            }
+            return l;
+        }));
+
+        // 3. Load new structure
+        try {
+            console.log('Parsing structure:', fileName);
+            const { atoms: newAtoms, lattice: newLat } = await parse(content, undefined, fileName);
+            
+            const newIds = addAtoms(newAtoms, newLat, true);
+            const newLayerId = newIds.layerId;
+            
+            // Mark new layer as green
+            setLayers(prev => prev.map(l => {
+                if (l.id === newLayerId) {
+                    return { ...l, isAgentResult: true }; // isAgentResult -> Green
+                }
+                return l;
+            }));
+            
+            setAgentReviewState({
+                status: 'reviewing',
+                originalLayers: selectedLayerIds,
+                resultLayerId: newLayerId
+            });
+            
+            setSelectedAtomIds(newIds);
+            setFileError(null);
+            console.log('Structure loaded into new layer for review');
+        } catch (e) {
+            console.error('Error loading structure:', e);
+            setFileError(e.message);
+        }
+    };
+
+    const acceptAgentResult = () => {
+        const { originalLayers, resultLayerId } = agentReviewState;
+        setLayers(prev => prev.filter(l => !originalLayers.includes(l.id)).map(l => {
+             if (l.id === resultLayerId) {
+                 const { isAgentResult, ...rest } = l;
+                 return rest; // Remove green status
+             }
+             return l;
+        }));
+        setAgentReviewState({ status: 'idle', originalLayers: [], resultLayerId: null });
+    };
+
+    const denyAgentResult = () => {
+        const { originalLayers, resultLayerId } = agentReviewState;
+        setLayers(prev => prev.filter(l => l.id !== resultLayerId).map(l => {
+            if (originalLayers.includes(l.id)) {
+                const { isAgentInput, visible, ...rest } = l;
+                return { ...rest, visible: true }; // Restore visibility and remove red status
+            }
+            return l;
+        }));
+        setAgentReviewState({ status: 'idle', originalLayers: [], resultLayerId: null });
+    };
+
     // Initial Load
     useEffect(() => {
         // Start empty; keep the default lattice from initial state (10x10x10)
@@ -329,6 +404,11 @@ export const MolecularProvider = ({ children }) => {
         changeLanguage,
         renameLayer,
         loadStructureFromText,
+        // Agent Review
+        agentReviewState,
+        handleAgentResult,
+        acceptAgentResult,
+        denyAgentResult,
         // Renderer API
         currentRenderer, setCurrentRenderer, renderers, showRendererDropdown, setShowRendererDropdown, changeRenderer
     };
