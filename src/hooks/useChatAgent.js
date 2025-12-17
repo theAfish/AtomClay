@@ -160,6 +160,12 @@ export const useChatAgent = () => {
 
         try {
             const structurePayload = buildStructurePayload({ atoms, lattice, layers, activeLayerId, sessionId });
+            
+            let messageText = trimmed;
+            if (structurePayload && structurePayload.fileName) {
+                messageText += `\n\nSystem: The user has uploaded a structure file at inputs/${structurePayload.fileName}`;
+            }
+
             const payload = {
                 // match the shape in _debug/payload.json — change these defaults as needed
                 appName: CHAT_CONSTANTS.DEFAULTS.AGENT_NAME,
@@ -168,7 +174,7 @@ export const useChatAgent = () => {
                 newMessage: {
                     role: 'user',
                     parts: [
-                        { text: trimmed }
+                        { text: messageText }
                     ]
                 }
             };

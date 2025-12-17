@@ -197,7 +197,12 @@ export const MolecularProvider = ({ children }) => {
         let s = "AtomClay\n1.0\n";
         lattice.forEach(v => s+=` ${v[0].toFixed(6)} ${v[1].toFixed(6)} ${v[2].toFixed(6)}\n`);
         const groups={};
-        atoms.forEach(a=>{ if(!groups[a.element])groups[a.element]=[]; groups[a.element].push(a); });
+        
+        // Filter atoms from visible layers only
+        const visibleLayerIds = new Set(layers.filter(l => l.visible).map(l => l.id));
+        const visibleAtoms = atoms.filter(a => visibleLayerIds.has(a.layerId));
+        
+        visibleAtoms.forEach(a=>{ if(!groups[a.element])groups[a.element]=[]; groups[a.element].push(a); });
         const els=Object.keys(groups);
         s+=` ${els.join(' ')}\n ${els.map(e=>groups[e].length).join(' ')}\nDirect\n`;
         const invL = MathUtils.inv3x3(lattice);
@@ -211,7 +216,7 @@ export const MolecularProvider = ({ children }) => {
         });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(new Blob([s], {type:'text/plain'}));
-        a.download = 'POSCAR';
+        a.download = 'out.POSCAR';
         a.click();
     };
 

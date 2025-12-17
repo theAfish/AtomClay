@@ -5,16 +5,18 @@
  * @returns {Promise<{atoms: Array<{id: number, element: string, x: number, y: number, z: number}>, lattice: number[][]|null}>} The parsed atoms and lattice (if found in comment).
  */
 export async function parse(text) {
-    const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l !== '');
-    if (lines.length < 2) {
+    const allLines = text.split(/\r?\n/).map(l => l.trim());
+    const firstLineIndex = allLines.findIndex(l => l !== '');
+
+    if (firstLineIndex === -1 || (firstLineIndex + 1) >= allLines.length) {
         throw new Error("XYZ parsing failed: File too short (needs at least atom count and comment line).");
     }
 
-    const count = parseInt(lines[0], 10);
+    const count = parseInt(allLines[firstLineIndex], 10);
     if (isNaN(count)) {
         throw new Error("XYZ parsing failed: First line must be the atom count.");
     }
-    const comment = lines[1] || '';
+    const comment = allLines[firstLineIndex + 1] || '';
 
     // Try to extract lattice/cell information from comment line
     let lattice = null;
@@ -30,10 +32,10 @@ export async function parse(text) {
         }
     }
 
+    const atomLines = allLines.slice(firstLineIndex + 2).filter(l => l !== '');
     const atoms = [];
-    const start = 2;
-    for (let i = 0; i < count && (start + i) < lines.length; i++) {
-        const parts = lines[start + i].split(/\s+/).filter(x => x !== '');
+    for (let i = 0; i < count && i < atomLines.length; i++) {
+        const parts = atomLines[i].split(/\s+/).filter(x => x !== '');
         if (parts.length < 4) continue;
         const element = parts[0];
         const x = parseFloat(parts[1]);

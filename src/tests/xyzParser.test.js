@@ -38,4 +38,16 @@ H 0.0 0.0 0.0
         const invalidContent = `Invalid`;
         await expect(parse(invalidContent)).rejects.toThrow('XYZ parsing failed');
     });
+
+    it('should parse XYZ with empty comment line', async () => {
+        const xyzContent = `2
+
+H 0.0 0.0 0.0
+O 1.0 1.0 1.0
+`;
+        const { atoms } = await parse(xyzContent);
+        expect(atoms.length).toBe(2);
+        expect(atoms[0].element).toBe('H');
+        expect(atoms[1].element).toBe('O');
+    });
 });

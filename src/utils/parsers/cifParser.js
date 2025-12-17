@@ -1,4 +1,54 @@
 // Minimal CIF parser with Corrected Matrix Orientation
+
+// Helper to parse a single symmetry operation string into a function
+function parseSymmetryFunction(opString) {
+    // opString e.g. "-x, y+1/2, -z"
+    // Remove quotes and spaces
+    const parts = opString.toLowerCase().replace(/['"]/g, '').split(',').map(s => s.trim());
+    
+    const parsePart = (part) => {
+        let scaleX = 0, scaleY = 0, scaleZ = 0, offset = 0;
+        
+        // Regex to match terms: +/- x/y/z or numbers
+        // We handle terms like: -x, +y, z, 1/2, -0.5
+        const terms = part.match(/([+-]?\s*(\d+(\.\d+)?(\/\d+)?|[xyz]))/g);
+        
+        if (terms) {
+            for (let term of terms) {
+                term = term.replace(/\s+/g, '');
+                let sign = 1;
+                if (term.startsWith('-')) { sign = -1; term = term.substring(1); }
+                else if (term.startsWith('+')) { term = term.substring(1); }
+                
+                if (term === 'x') scaleX += sign;
+                else if (term === 'y') scaleY += sign;
+                else if (term === 'z') scaleZ += sign;
+                else {
+                    // Number
+                    if (term.includes('/')) {
+                        const [n, d] = term.split('/');
+                        offset += sign * (parseFloat(n) / parseFloat(d));
+                    } else {
+                        offset += sign * parseFloat(term);
+                    }
+                }
+            }
+        }
+        return { x: scaleX, y: scaleY, z: scaleZ, c: offset };
+    };
+    
+    const opX = parsePart(parts[0] || 'x');
+    const opY = parsePart(parts[1] || 'y');
+    const opZ = parsePart(parts[2] || 'z');
+    
+    return (x, y, z) => {
+        const nx = opX.x * x + opX.y * y + opX.z * z + opX.c;
+        const ny = opY.x * x + opY.y * y + opY.z * z + opY.c;
+        const nz = opZ.x * x + opZ.y * y + opZ.z * z + opZ.c;
+        return [nx, ny, nz];
+    };
+}
+
 /**
  * Parses a CIF file content.
  * @param {string} text - The content of the CIF file.
@@ -6,12 +56,7 @@
  */
 export async function parse(text) {
     const lines = text.split(/\r?\n/);
-    const atoms = [];
     
-    // 最终返回的 lattice 将是一个包含三个向量的数组：[VectorA, VectorB, VectorC]
-    // 每个 Vector 是 [x, y, z]
-    let lattice = null;
-
     // 1. Parse Cell Parameters
     const cell = { a: null, b: null, c: null, alpha: null, beta: null, gamma: null };
     
@@ -22,25 +67,117 @@ export async function parse(text) {
         return parseFloat(str);
     };
 
-    for (let line of lines) {
-        line = line.trim();
-        if (!line || line.startsWith('#')) continue;
-        const parts = line.split(/\s+/);
-        const tag = parts[0];
-        const val = parts[1];
+    // Store symmetry operations strings
+    const symmetryStrings = [];
+    // Store base atoms (fractional)
+    const baseAtoms = [];
 
-        if (tag === '_cell_length_a') cell.a = cleanFloat(val);
-        else if (tag === '_cell_length_b') cell.b = cleanFloat(val);
-        else if (tag === '_cell_length_c') cell.c = cleanFloat(val);
-        else if (tag === '_cell_angle_alpha') cell.alpha = cleanFloat(val);
-        else if (tag === '_cell_angle_beta') cell.beta = cleanFloat(val);
-        else if (tag === '_cell_angle_gamma') cell.gamma = cleanFloat(val);
+    let lattice = null;
+    let currentLoopHeaders = [];
+    let insideLoop = false;
+    
+    // Loop state
+    let loopType = null; // 'atom', 'sym', 'other'
+
+    for (let i = 0; i < lines.length; i++) {
+        let line = lines[i].trim();
+        if (!line || line.startsWith('#')) continue;
+
+        // Handle loop_
+        if (line.startsWith('loop_')) {
+            currentLoopHeaders = [];
+            insideLoop = true;
+            loopType = null;
+            continue;
+        }
+
+        // If inside loop, check if it's a header or data
+        if (insideLoop) {
+            if (line.startsWith('_')) {
+                currentLoopHeaders.push(line);
+                // Identify loop type
+                if (line.startsWith('_atom_site_fract_x')) loopType = 'atom';
+                if (line.startsWith('_symmetry_equiv_pos_as_xyz') || line.startsWith('_space_group_symop_operation_xyz')) loopType = 'sym';
+            } else {
+                // Data line
+                // Use regex to handle quoted strings correctly
+                const parts = line.match(/('[^']*'|"[^"]*"|\S+)/g); 
+                if (!parts) continue;
+                
+                // If we hit a new tag or loop, break loop (though standard CIF shouldn't do this without loop_)
+                if (line.startsWith('_') || line.startsWith('loop_')) {
+                    insideLoop = false;
+                    i--; // Reprocess this line
+                    continue;
+                }
+
+                if (loopType === 'atom') {
+                    const xIdx = currentLoopHeaders.indexOf('_atom_site_fract_x');
+                    const yIdx = currentLoopHeaders.indexOf('_atom_site_fract_y');
+                    const zIdx = currentLoopHeaders.indexOf('_atom_site_fract_z');
+                    const lblIdx = currentLoopHeaders.indexOf('_atom_site_label');
+                    const symIdx = currentLoopHeaders.indexOf('_atom_site_type_symbol');
+
+                    if (xIdx !== -1 && yIdx !== -1 && zIdx !== -1 && parts.length >= 3) { // Relaxed length check
+                         // Ensure indices are within bounds of parts
+                         const fx = cleanFloat(parts[xIdx]);
+                         const fy = cleanFloat(parts[yIdx]);
+                         const fz = cleanFloat(parts[zIdx]);
+                         
+                         if (!isNaN(fx) && !isNaN(fy) && !isNaN(fz)) {
+                             let element = (symIdx >= 0 && parts[symIdx]) ? parts[symIdx] : '';
+                             const label = (lblIdx >= 0 && parts[lblIdx]) ? parts[lblIdx] : '';
+                             
+                             if (!element && label) {
+                                const raw = label.replace(/[^A-Za-z]/g, '');
+                                if (raw.length > 1 && raw[1] === raw[1].toLowerCase()) element = raw.substring(0, 2);
+                                else element = raw.substring(0, 1) || 'X';
+                             }
+                             
+                             baseAtoms.push({ element, fx, fy, fz, label });
+                         }
+                    }
+                } else if (loopType === 'sym') {
+                    // Find the index of the symmetry tag
+                    let symIdx = currentLoopHeaders.indexOf('_symmetry_equiv_pos_as_xyz');
+                    if (symIdx === -1) symIdx = currentLoopHeaders.indexOf('_space_group_symop_operation_xyz');
+                    
+                    if (symIdx !== -1 && parts.length > symIdx) {
+                        let op = parts[symIdx];
+                        // Remove quotes
+                        if ((op.startsWith("'") && op.endsWith("'")) || (op.startsWith('"') && op.endsWith('"'))) {
+                            op = op.substring(1, op.length - 1);
+                        }
+                        symmetryStrings.push(op);
+                    }
+                }
+            }
+        } else {
+            // Non-loop tags
+            const parts = line.split(/\s+/);
+            const tag = parts[0];
+            const val = parts[1];
+
+            if (tag === '_cell_length_a') cell.a = cleanFloat(val);
+            else if (tag === '_cell_length_b') cell.b = cleanFloat(val);
+            else if (tag === '_cell_length_c') cell.c = cleanFloat(val);
+            else if (tag === '_cell_angle_alpha') cell.alpha = cleanFloat(val);
+            else if (tag === '_cell_angle_beta') cell.beta = cleanFloat(val);
+            else if (tag === '_cell_angle_gamma') cell.gamma = cleanFloat(val);
+            
+            // Handle single line symmetry (rare but possible)
+            if (tag === '_symmetry_equiv_pos_as_xyz' || tag === '_space_group_symop_operation_xyz') {
+                 let op = line.substring(tag.length).trim();
+                 if ((op.startsWith("'") && op.endsWith("'")) || (op.startsWith('"') && op.endsWith('"'))) {
+                    op = op.substring(1, op.length - 1);
+                 }
+                 symmetryStrings.push(op);
+            }
+        }
     }
 
-    // 2. Calculate Lattice Vectors (Corrected Orientation)
-    // 这里的逻辑是计算出三个基矢量：vA, vB, vC
+    // 2. Calculate Lattice Vectors
     let vA, vB, vC;
-
     if (cell.a && cell.b && cell.c && cell.alpha) {
         const toRad = Math.PI / 180;
         const alpha = cell.alpha * toRad;
@@ -55,104 +192,67 @@ export async function parse(text) {
         const term = (cosAlpha - cosBeta * cosGamma) / sinGamma;
         const v3zValue = Math.sqrt(Math.max(0, 1 - cosBeta * cosBeta - term * term));
 
-        // 定义三个基矢量 (Row Vectors)
-        // Vector A: 沿 X 轴
         vA = [cell.a, 0, 0];
-
-        // Vector B: 在 XY 平面
         vB = [cell.b * cosGamma, cell.b * sinGamma, 0];
-
-        // Vector C: 任意方向
         vC = [cell.c * cosBeta, cell.c * term, cell.c * v3zValue];
-
-        // 【重要修改】: 这里的 lattice 现在是 [VectorA, VectorB, VectorC]
-        // 方便你直接绘图：
-        // lattice[0] 就是 a 轴向量
-        // lattice[1] 就是 b 轴向量
-        // lattice[2] 就是 c 轴向量
         lattice = [vA, vB, vC];
     }
 
-    // 3. Parse Atoms
-    let currentLoopHeaders = [];
-    let insideAtomLoop = false;
+    // 3. Apply Symmetry
+    if (symmetryStrings.length === 0) {
+        symmetryStrings.push('x, y, z');
+    }
     
-    // 归一化：保证坐标在 [0, 1) 之间
+    const symOps = symmetryStrings.map(parseSymmetryFunction);
+    const finalAtoms = [];
+    
     const normalize = (val) => ((val % 1) + 1) % 1;
+    const isDuplicate = (p1, p2) => {
+        let dx = Math.abs(p1.fx - p2.fx); if (dx > 0.5) dx = 1 - dx;
+        let dy = Math.abs(p1.fy - p2.fy); if (dy > 0.5) dy = 1 - dy;
+        let dz = Math.abs(p1.fz - p2.fz); if (dz > 0.5) dz = 1 - dz;
+        return (dx*dx + dy*dy + dz*dz) < 0.000001;
+    };
 
-    for (let i = 0; i < lines.length; i++) {
-        let line = lines[i].trim();
-        if (!line || line.startsWith('#')) continue;
-
-        if (line.startsWith('loop_')) {
-            currentLoopHeaders = [];
-            insideAtomLoop = false;
-            continue;
-        }
-
-        if (line.startsWith('_')) {
-            currentLoopHeaders.push(line);
-            if (line === '_atom_site_fract_x') insideAtomLoop = true;
-        } else if (insideAtomLoop) {
-            const xIdx = currentLoopHeaders.indexOf('_atom_site_fract_x');
-            const yIdx = currentLoopHeaders.indexOf('_atom_site_fract_y');
-            const zIdx = currentLoopHeaders.indexOf('_atom_site_fract_z');
-            const lblIdx = currentLoopHeaders.indexOf('_atom_site_label');
-            const symIdx = currentLoopHeaders.indexOf('_atom_site_type_symbol');
-
-            if (xIdx === -1 || yIdx === -1 || zIdx === -1) {
-                // If we are in an atom loop but missing coordinates, we can't parse atoms.
-                // However, there might be multiple loops. We should only fail if we try to parse a line as an atom and fail.
-                // But here we just continue.
-                // Let's check if we actually found any atoms at the end.
-                continue;
-            }
-
-            const parts = line.split(/\s+/);
-            if (parts[0].startsWith('data_') || parts[0].startsWith('loop_')) {
-                insideAtomLoop = false;
-                continue;
-            }
-            if (parts.length < currentLoopHeaders.length) continue;
-
-            const fx = normalize(cleanFloat(parts[xIdx]));
-            const fy = normalize(cleanFloat(parts[yIdx]));
-            const fz = normalize(cleanFloat(parts[zIdx]));
-
-            if (isNaN(fx) || isNaN(fy) || isNaN(fz)) {
-                 console.warn(`Skipping invalid atom line: ${line}`);
-                 continue;
-            }
-
-            let element = symIdx >= 0 ? parts[symIdx] : '';
-            const label = lblIdx >= 0 ? parts[lblIdx] : '';
+    for (const atom of baseAtoms) {
+        const siteAtoms = [];
+        for (const op of symOps) {
+            const [nx, ny, nz] = op(atom.fx, atom.fy, atom.fz);
+            const newAtom = {
+                element: atom.element,
+                fx: normalize(nx),
+                fy: normalize(ny),
+                fz: normalize(nz)
+            };
             
-            if (!element && label) {
-                const raw = label.replace(/[^A-Za-z]/g, '');
-                if (raw.length > 1 && raw[1] === raw[1].toLowerCase()) element = raw.substring(0, 2);
-                else element = raw.substring(0, 1) || 'X';
+            let dup = false;
+            for (const existing of siteAtoms) {
+                if (isDuplicate(newAtom, existing)) {
+                    dup = true;
+                    break;
+                }
             }
-
-            // 坐标转换 (Cartesian Calculation)
-            // P = fx * A + fy * B + fz * C
-            let x = 0, y = 0, z = 0;
-            if (lattice) {
-                x = fx * vA[0] + fy * vB[0] + fz * vC[0];
-                y = fx * vA[1] + fy * vB[1] + fz * vC[1];
-                z = fx * vA[2] + fy * vB[2] + fz * vC[2];
-            } else {
-                x = fx; y = fy; z = fz;
+            if (!dup) {
+                siteAtoms.push(newAtom);
             }
-
-            atoms.push({ element, x, y, z });
         }
+        finalAtoms.push(...siteAtoms);
     }
 
-    if (atoms.length === 0) {
-        throw new Error("CIF parsing failed: No valid atoms found. Ensure '_atom_site_fract_x/y/z' tags are present.");
-    }
+    // 4. Convert to Cartesian
+    const cartesianAtoms = finalAtoms.map(atom => {
+        let x = 0, y = 0, z = 0;
+        if (lattice) {
+            x = atom.fx * vA[0] + atom.fy * vB[0] + atom.fz * vC[0];
+            y = atom.fx * vA[1] + atom.fy * vB[1] + atom.fz * vC[1];
+            z = atom.fx * vA[2] + atom.fy * vB[2] + atom.fz * vC[2];
+        } else {
+            x = atom.fx; y = atom.fy; z = atom.fz;
+        }
+        return { element: atom.element, x, y, z };
+    });
 
-    return { atoms, lattice };
+    return { atoms: cartesianAtoms, lattice };
 }
 
 export default { parse };
