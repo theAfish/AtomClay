@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageCircle, Send, X } from 'lucide-react';
+import { MessageCircle, Send, X, Copy } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useMolecularContext } from '../context/MolecularContext';
 import { PANEL_CLASSES } from '../constants/theme';
@@ -60,10 +60,10 @@ const ChatPanel = ({ isOpen, onToggle }) => {
             <div className={`fixed top-1/2 ${isOpen ? 'right-80' : 'right-0'} transform -translate-y-1/2 z-50`}>
                 <button
                     onClick={onToggle}
-                    className={`${panelClass} p-3 rounded-l-xl shadow-xl hover:shadow-2xl transition-all duration-200`}
+                    className={`${panelClass} px-2 py-3 rounded-l-xl shadow-xl hover:shadow-2xl transition-all duration-200`}
                     title={isOpen ? t('Close Chat') : t('Open Chat')}
                 >
-                    <MessageCircle size={20} className={textPrimary} />
+                    <MessageCircle size={18} className={textPrimary} />
                 </button>
             </div>
             {isOpen && (
@@ -91,7 +91,7 @@ const ChatPanel = ({ isOpen, onToggle }) => {
                                 className={`flex ${message.sender === CHAT_CONSTANTS.SENDERS.USER ? 'justify-end' : message.sender === CHAT_CONSTANTS.SENDERS.SYSTEM ? 'justify-center' : 'justify-start'}`}
                             >
                                 <div
-                                    className={`select-text max-w-[80%] p-3 rounded-lg ${
+                                    className={`select-text max-w-[80%] p-3 rounded-lg group ${
                                         message.sender === CHAT_CONSTANTS.SENDERS.USER
                                             ? `${buttonPrimary} text-white`
                                             : message.sender === CHAT_CONSTANTS.SENDERS.SYSTEM || message.type === CHAT_CONSTANTS.MESSAGE_TYPES.LOG
@@ -100,11 +100,22 @@ const ChatPanel = ({ isOpen, onToggle }) => {
                                     }`}
                                 >
                                     <p className="text-sm">{message.text}</p>
-                                    <p className={`text-xs mt-1 ${
-                                        message.sender === CHAT_CONSTANTS.SENDERS.USER ? 'text-blue-100' : textSecondary
-                                    }`}>
-                                        {message.timestamp.toLocaleTimeString()}
-                                    </p>
+                                    <div className="flex justify-between items-center mt-1">
+                                        <p className={`text-xs ${
+                                            message.sender === CHAT_CONSTANTS.SENDERS.USER ? 'text-blue-100' : textSecondary
+                                        }`}>
+                                            {message.timestamp.toLocaleTimeString()}
+                                        </p>
+                                        <button
+                                            className={`opacity-0 group-hover:opacity-100 transition-opacity text-xs p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-600 cursor-pointer ${
+                                                message.sender === CHAT_CONSTANTS.SENDERS.USER ? 'text-white hover:bg-blue-600' : textSecondary
+                                            }`}
+                                            onClick={() => navigator.clipboard.writeText(message.text)}
+                                            title={t('Copy Message')}
+                                        >
+                                            <Copy size={12} />
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         ))}
