@@ -301,7 +301,7 @@ export const MolecularProvider = ({ children }) => {
     };
 
     // Agent Review State
-    const [agentReviewState, setAgentReviewState] = useState({ status: 'idle', originalLayers: [], resultLayerId: null });
+    const [agentReviewState, setAgentReviewState] = useState({ status: 'idle', originalLayers: [], resultLayerId: null, originalLattice: null, originalLatticeSource: null });
 
     const handleAgentResult = async (content, fileName) => {
         // 1. Identify selected layers (sent to agent)
@@ -332,10 +332,17 @@ export const MolecularProvider = ({ children }) => {
                 return l;
             }));
             
+            // Set lattice to agent's lattice immediately
+            if (newLat) {
+                setLattice(newLat, newLayerId);
+            }
+            
             setAgentReviewState({
                 status: 'reviewing',
                 originalLayers: selectedLayerIds,
-                resultLayerId: newLayerId
+                resultLayerId: newLayerId,
+                originalLattice: lattice,
+                originalLatticeSource: activeLayerId
             });
             
             setSelectedAtomIds(newIds);
@@ -348,7 +355,7 @@ export const MolecularProvider = ({ children }) => {
     };
 
     const acceptAgentResult = () => {
-        const { originalLayers, resultLayerId } = agentReviewState;
+        const { originalLayers, resultLayerId, originalLattice, originalLatticeSource } = agentReviewState;
         setLayers(prev => prev.filter(l => !originalLayers.includes(l.id)).map(l => {
              if (l.id === resultLayerId) {
                  const { isAgentResult, ...rest } = l;
@@ -356,19 +363,31 @@ export const MolecularProvider = ({ children }) => {
              }
              return l;
         }));
-        setAgentReviewState({ status: 'idle', originalLayers: [], resultLayerId: null });
+        setAgentReviewState({ status: 'idle', originalLayers: [], resultLayerId: null, originalLattice: null, originalLatticeSource: null });
     };
 
     const denyAgentResult = () => {
-        const { originalLayers, resultLayerId } = agentReviewState;
-        setLayers(prev => prev.filter(l => l.id !== resultLayerId).map(l => {
-            if (originalLayers.includes(l.id)) {
-                const { isAgentInput, visible, ...rest } = l;
-                return { ...rest, visible: true }; // Restore visibility and remove red status
+        const { originalLayers, resultLayerId, originalLattice, originalLatticeSource } = agentReviewState;
+        setLayers(prev => {
+            const next = prev.filter(l => l.id !== resultLayerId).map(l => {
+                if (originalLayers.includes(l.id)) {
+                    const { isAgentInput, visible, ...rest } = l;
+                    return { ...rest, visible: true }; // Restore visibility and remove red status
+                }
+                return l;
+            });
+            // If active was result, set to first original
+            if (activeLayerId === resultLayerId) {
+                const firstOriginal = originalLayers.find(id => next.some(l => l.id === id));
+                if (firstOriginal) {
+                    setActiveLayerId(firstOriginal);
+                }
             }
-            return l;
-        }));
-        setAgentReviewState({ status: 'idle', originalLayers: [], resultLayerId: null });
+            return next;
+        });
+        // Revert lattice
+        setLattice(originalLattice, agentReviewState.originalLatticeSource);
+        setAgentReviewState({ status: 'idle', originalLayers: [], resultLayerId: null, originalLattice: null, originalLatticeSource: null });
     };
 
     const handleLayerReviewAction = (layerId, action) => {
@@ -379,17 +398,36 @@ export const MolecularProvider = ({ children }) => {
                 if (action === 'keep') {
                     // Remove flags, ensure visibility
                     const { isAgentInput, isAgentResult, visible, ...rest } = l;
-                    return { ...rest, visible: true };
+                    const kept = { ...rest, visible: true };
+                    // If it's the result layer, set lattice
+                    if (l.isAgentResult && l.lattice) {
+                        setLattice(l.lattice, layerId);
+                    }
+                    return kept;
                 } else if (action === 'discard') {
+                    // If discarding result, revert lattice
+                    if (l.isAgentResult) {
+                        setLattice(agentReviewState.originalLattice, agentReviewState.originalLatticeSource);
+                    }
                     return null; // Will filter out
                 }
                 return l;
             }).filter(Boolean);
 
+            // If discarding active layer, set to another
+            if (action === 'discard' && activeLayerId === layerId) {
+                const remaining = nextLayers.filter(l => l.visible);
+                if (remaining.length > 0) {
+                    setActiveLayerId(remaining[0].id);
+                } else {
+                    setActiveLayerId(null);
+                }
+            }
+
             // Check if any flagged layers remain
             const hasFlagged = nextLayers.some(l => l.isAgentInput || l.isAgentResult);
             if (!hasFlagged) {
-                setAgentReviewState({ status: 'idle', originalLayers: [], resultLayerId: null });
+                setAgentReviewState({ status: 'idle', originalLayers: [], resultLayerId: null, originalLattice: null, originalLatticeSource: null });
             }
 
             return nextLayers;
