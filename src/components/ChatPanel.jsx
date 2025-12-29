@@ -91,7 +91,7 @@ const ChatPanel = ({ isOpen, onToggle }) => {
                                 className={`flex ${message.sender === CHAT_CONSTANTS.SENDERS.USER ? 'justify-end' : message.sender === CHAT_CONSTANTS.SENDERS.SYSTEM ? 'justify-center' : 'justify-start'}`}
                             >
                                 <div
-                                    className={`max-w-[80%] p-3 rounded-lg ${
+                                    className={`select-text max-w-[80%] p-3 rounded-lg ${
                                         message.sender === CHAT_CONSTANTS.SENDERS.USER
                                             ? `${buttonPrimary} text-white`
                                             : message.sender === CHAT_CONSTANTS.SENDERS.SYSTEM || message.type === CHAT_CONSTANTS.MESSAGE_TYPES.LOG
@@ -110,7 +110,7 @@ const ChatPanel = ({ isOpen, onToggle }) => {
                         ))}
                         {isSending && (
                             <div className="flex justify-start">
-                                <div className={`max-w-[80%] p-3 rounded-lg ${bgInput} ${textSecondary} italic`}>
+                                <div className={`select-text max-w-[80%] p-3 rounded-lg ${bgInput} ${textSecondary} italic`}>
                                     <div className="flex items-center gap-2">
                                         <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
                                         <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
