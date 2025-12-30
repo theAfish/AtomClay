@@ -10,6 +10,7 @@ import SupercellForm from './operations/SupercellForm';
 import VacuumForm from './operations/VacuumForm';
 import ScaleForm from './operations/ScaleForm';
 import SetLatticeForm from './operations/SetLatticeForm';
+import InterfaceForm from './operations/InterfaceForm';
 
 const LeftPanel = () => {
     const { t } = useTranslation();
@@ -35,6 +36,7 @@ const LeftPanel = () => {
 
     const [expand, setExpand] = useState(false);
     const [expandLattice, setExpandLattice] = useState(false);
+    const [expandInterface, setExpandInterface] = useState(false);
     const [latticeTab, setLatticeTab] = useState('vacuum');
     
     // Two separate editing states: one for the header (active layer) and one for the layers list
@@ -115,6 +117,17 @@ const LeftPanel = () => {
                                     <SetLatticeForm handleSetLattice={handleSetLattice} lattice={lattice} t={t} panels={panels} />
                                 )}
                             </div>
+                        )}
+                    </div>
+
+                    {/* Interface Building */}
+                    <div className={`${panels.bgCard} p-2 rounded border ${borderClass}`}>
+                        <button onClick={() => setExpandInterface(!expandInterface)} className={`w-full flex justify-between text-sm ${textSecondary} hover:${textPrimary}`}>
+                            <span className="flex items-center gap-2"><Layers size={16} /> {t('Interface Building')}</span>
+                            <ChevronDown size={14} className={`transition ${expandInterface?'rotate-180':''}`} />
+                        </button>
+                        {expandInterface && (
+                            <InterfaceForm layers={layers} t={t} panels={panels} />
                         )}
                     </div>
                 </div>

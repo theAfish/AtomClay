@@ -25,6 +25,11 @@ export default defineConfig(({ command }) => {
           changeOrigin: true,
           secure: false,
         },
+        '/materials': {
+          target: 'http://localhost:3000',
+          changeOrigin: true,
+          secure: false,
+        },
         '/get_final_structure': {
           target: 'http://localhost:3000',
           changeOrigin: true,
