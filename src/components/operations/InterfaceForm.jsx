@@ -13,9 +13,56 @@ const InterfaceForm = ({ t, panels }) => {
     const [millerA, setMillerA] = useState({ h: 1, k: 0, l: 0 });
     const [millerB, setMillerB] = useState({ h: 1, k: 0, l: 0 });
     
+    // New state for additional parameters
+    const [gap, setGap] = useState(2.5);
+    const [vacuumOverFilm, setVacuumOverFilm] = useState(0.0);
+    const [filmThickness, setFilmThickness] = useState(1);
+    const [substrateThickness, setSubstrateThickness] = useState(1);
+    
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [results, setResults] = useState([]);
+    const [previewedInterface, setPreviewedInterface] = useState(null);
+
+    const clearPreview = () => {
+        if (previewedInterface) {
+            // Remove the preview layer and atoms
+            setLayers(prev => prev.filter(l => l.id !== `preview-${previewedInterface.id}`));
+            setAtoms(prev => prev.filter(a => a.layerId !== `preview-${previewedInterface.id}`));
+            // Show all layers again
+            setLayers(prev => prev.map(l => ({ ...l, visible: true })));
+            setPreviewedInterface(null);
+        }
+    };
+
+    const previewInterface = (iface) => {
+        clearPreview(); // Remove previous preview if any
+        // Hide all layers
+        setLayers(prev => prev.map(l => ({ ...l, visible: false })));
+        // Add preview layer
+        const previewLayerId = `preview-${iface.id}`;
+        const previewLayer = {
+            id: previewLayerId,
+            name: `Preview Interface ${iface.id}`,
+            visible: true,
+            selected: true,
+            opacity: 1,
+            lattice: iface.lattice
+        };
+        const previewAtoms = iface.atoms.map((a, idx) => ({
+            id: `${previewLayerId}-${idx}`,
+            element: a.element,
+            x: a.x,
+            y: a.y,
+            z: a.z,
+            layerId: previewLayerId
+        }));
+        setLayers(prev => [...prev, previewLayer]);
+        setAtoms(prev => [...prev, ...previewAtoms]);
+        setActiveLayerId(previewLayerId);
+        setLattice(iface.lattice);
+        setPreviewedInterface(iface);
+    };
 
     const handleApply = async () => {
         setError(null);
@@ -57,10 +104,10 @@ const InterfaceForm = ({ t, panels }) => {
                 max_area: 400.0,
                 max_length_tol: 0.03,
                 max_angle_tol: 0.01,
-                gap: 2.5,
-                vacuum_over_film: 10.0,
-                film_thickness: 1,
-                substrate_thickness: 1,
+                gap: parseFloat(gap) || 2.5,
+                vacuum_over_film: parseFloat(vacuumOverFilm) || 0.0,
+                film_thickness: parseInt(filmThickness) || 1,
+                substrate_thickness: parseInt(substrateThickness) || 1,
                 in_layers: true,
                 max_interfaces: 1000
             };
@@ -79,6 +126,7 @@ const InterfaceForm = ({ t, panels }) => {
     };
 
     const loadInterface = (iface) => {
+        clearPreview(); // Clear any preview before loading
         const newLayerId = `layer-${Date.now()}`;
         const newLayer = {
             id: newLayerId,
@@ -182,6 +230,53 @@ const InterfaceForm = ({ t, panels }) => {
                 </div>
             </div>
 
+            {/* Interface Parameters */}
+            <div className="space-y-2">
+                <label className={`block text-xs ${textSecondary} mb-1`}>{t('Interface Parameters')}</label>
+                <div className="grid grid-cols-2 gap-2">
+                    <div>
+                        <label className={`block text-xs ${textSecondary} mb-1`}>{t('Gap (Å)')}</label>
+                        <input 
+                            type="number" 
+                            step="0.1"
+                            value={gap}
+                            onChange={(e) => setGap(e.target.value)}
+                            className={`w-full p-1 text-sm rounded border ${bgInput} ${textPrimary} ${borderClass}`}
+                        />
+                    </div>
+                    <div>
+                        <label className={`block text-xs ${textSecondary} mb-1`}>{t('Vacuum (Å)')}</label>
+                        <input 
+                            type="number" 
+                            step="0.1"
+                            value={vacuumOverFilm}
+                            onChange={(e) => setVacuumOverFilm(e.target.value)}
+                            className={`w-full p-1 text-sm rounded border ${bgInput} ${textPrimary} ${borderClass}`}
+                        />
+                    </div>
+                    <div>
+                        <label className={`block text-xs ${textSecondary} mb-1`}>{t('Layer A Thickness')}</label>
+                        <input 
+                            type="number" 
+                            min="1"
+                            value={filmThickness}
+                            onChange={(e) => setFilmThickness(e.target.value)}
+                            className={`w-full p-1 text-sm rounded border ${bgInput} ${textPrimary} ${borderClass}`}
+                        />
+                    </div>
+                    <div>
+                        <label className={`block text-xs ${textSecondary} mb-1`}>{t('Layer B Thickness')}</label>
+                        <input 
+                            type="number" 
+                            min="1"
+                            value={substrateThickness}
+                            onChange={(e) => setSubstrateThickness(e.target.value)}
+                            className={`w-full p-1 text-sm rounded border ${bgInput} ${textPrimary} ${borderClass}`}
+                        />
+                    </div>
+                </div>
+            </div>
+
             <button 
                 onClick={handleApply}
                 disabled={loading}
@@ -203,12 +298,20 @@ const InterfaceForm = ({ t, panels }) => {
                         <div key={idx} className={`p-2 rounded border ${bgCard} ${borderClass} text-xs`}>
                             <div className="flex justify-between items-start mb-1">
                                 <span className={`${textPrimary} font-bold`}>#{idx+1} Strain: {(iface.von_mises_strain || 0).toFixed(4)}</span>
-                                <button 
-                                    onClick={() => loadInterface(iface)}
-                                    className={`${buttonPrimary} px-2 py-0.5 rounded text-[10px] flex items-center gap-1`}
-                                >
-                                    {t('Load')} <ChevronRight size={10} />
-                                </button>
+                                <div className="flex gap-1">
+                                    <button 
+                                        onClick={() => previewInterface(iface)}
+                                        className={`${buttonPrimary} px-2 py-0.5 rounded text-[10px]`}
+                                    >
+                                        {t('Preview')}
+                                    </button>
+                                    <button 
+                                        onClick={() => loadInterface(iface)}
+                                        className={`${buttonPrimary} px-2 py-0.5 rounded text-[10px] flex items-center gap-1`}
+                                    >
+                                        {t('Load')} <ChevronRight size={10} />
+                                    </button>
+                                </div>
                             </div>
                             <div className={`${textMuted} grid grid-cols-2 gap-1`}>
                                 <span>Area: {iface.area ? iface.area.toFixed(2) : 'N/A'} Å²</span>

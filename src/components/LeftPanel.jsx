@@ -50,33 +50,34 @@ const LeftPanel = () => {
     const { panelClass, textPrimary, textSecondary, textMuted, bgInput, bgInputDarker, borderClass, buttonSecondary, buttonPrimary, textTitle, textIcon, textLayerInfo, textNoLattice, buttonPreset, layerTextActive, layerTextMuted, layerTextAccent } = panels;
 
     return (
-        <div className="absolute top-4 left-4 w-80 flex flex-col gap-4 pointer-events-none">
-            <div className={`${panelClass} p-4 rounded-xl shadow-xl pointer-events-auto`}>
-                <h1 className={`text-xl font-bold mb-2 flex items-center gap-2 ${textTitle}`}>
-                    <Box className={`${textIcon}`} /> AtomClay
-                </h1>
-                <div className="flex gap-2 mb-4">
-                    <label className={`flex-1 cursor-pointer ${buttonPrimary} py-2 px-3 rounded-lg flex items-center justify-center gap-2 text-sm transition`}>
-                        <Upload size={16} /> {t('Load Molecule')}
-                        <input type="file" className="hidden" onChange={handleLoad} />
-                    </label>
-                    <button onClick={handleDownload} className={`${buttonSecondary} p-2 rounded-lg`} title={t('Download')}>
-                        <Download size={18} />
-                    </button>
+        <div className="absolute top-0 left-0 h-full w-80 pointer-events-none z-10">
+            <div className="w-full h-full overflow-y-auto p-4 flex flex-col gap-4 pointer-events-auto">
+                <div className={`${panelClass} p-4 rounded-xl shadow-xl`}>
+                    <h1 className={`text-xl font-bold mb-2 flex items-center gap-2 ${textTitle}`}>
+                        <Box className={`${textIcon}`} /> AtomClay
+                    </h1>
+                    <div className="flex gap-2 mb-4">
+                        <label className={`flex-1 cursor-pointer ${buttonPrimary} py-2 px-3 rounded-lg flex items-center justify-center gap-2 text-sm transition`}>
+                            <Upload size={16} /> {t('Load Molecule')}
+                            <input type="file" className="hidden" onChange={handleLoad} />
+                        </label>
+                        <button onClick={handleDownload} className={`${buttonSecondary} p-2 rounded-lg`} title={t('Download')}>
+                            <Download size={18} />
+                        </button>
+                    </div>
+                    <div className={`text-xs font-mono p-2 rounded border ${panels.bgCard} ${textSecondary} ${borderClass}`}>
+                        <p className="font-bold">{t('Active Layer')}: {activeLayer ? (
+                            <span className="inline-flex items-center gap-2">
+                                <LayerNameEditor layer={activeLayer} onRename={renameLayer} inputClass={`${bgInput} border ${borderClass} rounded px-2 ${textPrimary}`} />
+                            </span>
+                        ) : t('None')}</p>
+                        <p>{t('Atoms in layer')}: <span className="font-semibold">{layerAtomCount}</span> &nbsp;|&nbsp; {t('Total atoms')}: <span className="font-semibold">{totalAtomCount}</span></p>
+                        <p>{t('Chemical Formula')}: <span className="font-bold">{formula || 'N/A'}</span></p>
+                        {/* Lattice information removed from top info panel */}
+                    </div>
                 </div>
-                <div className={`text-xs font-mono p-2 rounded border ${panels.bgCard} ${textSecondary} ${borderClass}`}>
-                    <p className="font-bold">{t('Active Layer')}: {activeLayer ? (
-                        <span className="inline-flex items-center gap-2">
-                            <LayerNameEditor layer={activeLayer} onRename={renameLayer} inputClass={`${bgInput} border ${borderClass} rounded px-2 ${textPrimary}`} />
-                        </span>
-                    ) : t('None')}</p>
-                    <p>{t('Atoms in layer')}: <span className="font-semibold">{layerAtomCount}</span> &nbsp;|&nbsp; {t('Total atoms')}: <span className="font-semibold">{totalAtomCount}</span></p>
-                    <p>{t('Chemical Formula')}: <span className="font-bold">{formula || 'N/A'}</span></p>
-                    {/* Lattice information removed from top info panel */}
-                </div>
-            </div>
 
-            <div className={`${panelClass} p-4 rounded-xl shadow-xl pointer-events-auto`}>
+                <div className={`${panelClass} p-4 rounded-xl shadow-xl`}>
                 <h2 className={`text-sm font-bold mb-3 flex items-center gap-2 ${textPrimary}`}>
                     <Layers size={16} /> {t('Modeling Operations')}
                 </h2>
@@ -134,6 +135,7 @@ const LeftPanel = () => {
             </div>
 
             {/* Layers UI has been moved to the right panel to improve placement — this section intentionally kept empty in the left panel */}
+            </div>
         </div>
     );
 };

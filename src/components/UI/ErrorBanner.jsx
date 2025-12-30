@@ -7,7 +7,7 @@ const ErrorBanner = () => {
     if (!fileError) return null;
 
     return (
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 bg-red-600 text-white px-4 py-2 rounded shadow">
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[60] bg-red-600 text-white px-4 py-2 rounded shadow">
             <div style={{display:'flex', alignItems:'center', gap:8}}>
                 <div style={{fontWeight:600}}>File error:</div>
                 <div style={{opacity:0.95}}>{fileError}</div>

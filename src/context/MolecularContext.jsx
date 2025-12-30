@@ -182,7 +182,9 @@ export const MolecularProvider = ({ children }) => {
         if(!file) return;
         setFileError(null);
         try {
-            await importFile(file, false);
+            const isCurrentLayerEmpty = atoms.filter(a => a.layerId === activeLayerId).length === 0;
+            const createNewLayer = !isCurrentLayerEmpty;
+            await importFile(file, createNewLayer);
         } catch (e) {
             setFileError(e.message);
         } finally {
@@ -272,10 +274,12 @@ export const MolecularProvider = ({ children }) => {
         e.preventDefault();
         e.stopPropagation();
         const files = Array.from(e.dataTransfer.files);
+        let isFirst = layers.length === 1 && layers[0].id === 'layer-0' && atoms.filter(a => a.layerId === 'layer-0').length === 0;
         for (const file of files) {
-            const createNew = !(layers.length === 1 && layers[0].id === 'layer-0' && atoms.filter(a => a.layerId === 'layer-0').length === 0);
+            const createNew = !isFirst;
             try {
                 await importFile(file, createNew);
+                isFirst = false;
             } catch (err) {
                 setFileError(err.message);
             }

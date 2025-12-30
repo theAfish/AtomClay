@@ -49,8 +49,9 @@ const RightPanel = () => {
     // Local editing state for layers is now handled by reusable components
 
     return (
-        <div className="fixed top-4 w-80 pointer-events-none z-50" style={{ right: isChatOpen ? '336px' : '16px' }}>
-            <div className={`${panelClass} p-4 rounded-xl shadow-xl pointer-events-auto`}> 
+        <div className="fixed top-0 h-full w-80 pointer-events-none z-50" style={{ right: isChatOpen ? '320px' : '0' }}>
+            <div className="w-full h-full overflow-y-auto p-4 flex flex-col gap-4 pointer-events-auto">
+                <div className={`${panelClass} p-4 rounded-xl shadow-xl`}> 
                 <h2 className={`text-sm font-bold mb-3 flex items-center gap-2 ${textPrimary}`}>
                     <Scissors size={16} /> {t('Edit Tools')}
                 </h2>
@@ -120,7 +121,7 @@ const RightPanel = () => {
             </div>
 
             {/* Layers UI moved here from LeftPanel (refactored to reusable component) */}
-            <div className={`${panelClass} p-4 rounded-xl shadow-xl pointer-events-auto mt-4`}>
+            <div className={`${panelClass} p-4 rounded-xl shadow-xl`}>
                 <div className="flex items-center justify-between mb-3">
                     <h2 className={`text-sm font-bold flex items-center gap-2 ${textPrimary}`}>
                         <Layers size={16} /> {t('Layers')}
@@ -152,6 +153,7 @@ const RightPanel = () => {
                         handleLayerReviewAction={handleLayerReviewAction}
                     />
                 </div>
+            </div>
             </div>
         </div>
     );

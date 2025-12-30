@@ -7,7 +7,7 @@ const ViewModeToggle = () => {
     if (!pdbContent) return null;
 
     return (
-        <div className="absolute top-4 right-80 z-50 flex gap-2">
+        <div className="absolute top-4 right-80 z-[60] flex gap-2">
             <button 
                 className={`px-3 py-1 rounded shadow text-sm font-medium ${viewMode === 'default' ? 'bg-blue-600 text-white' : 'bg-white text-slate-700'}`}
                 onClick={() => setViewMode('default')}

@@ -28,17 +28,12 @@ describe('Layers panel rename UI (moved to right panel)', () => {
         const input = container.querySelector('input[type="text"]');
         expect(input).toBeTruthy();
 
-        // While editing, the "Use Lattice" and "Delete Layer" buttons should be invisible
+        // While editing, the "Use Lattice" and "Delete Layer" buttons should be removed from DOM
         const deleteBtn = container.querySelector('button[title="Delete Layer"]');
-        expect(deleteBtn).toBeTruthy();
-        // Tailwind `invisible` class is used to hide the buttons. Tests don't load CSS so
-        // check the class name instead of computed style.
-        expect(deleteBtn.classList.contains('invisible')).toBe(true);
+        expect(deleteBtn).toBeNull();
 
         const useLatBtn = Array.from(container.querySelectorAll('button')).find(b => b.textContent && b.textContent.includes('Use Lattice'));
-        if (useLatBtn) {
-            expect(useLatBtn.classList.contains('invisible')).toBe(true);
-        }
+        expect(useLatBtn).toBeUndefined();
 
         fireEvent.change(input, { target: { value: 'Renamed Layer' } });
         // Save button (title 'Save') should exist

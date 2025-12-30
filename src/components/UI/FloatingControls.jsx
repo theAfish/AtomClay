@@ -37,7 +37,7 @@ const FloatingControls = () => {
     }, [showLangDropdown, setShowLangDropdown, showRendererDropdown, setShowRendererDropdown]);
 
     return (
-        <div className="fixed bottom-4 z-50 flex flex-col gap-2" style={{ right: isChatOpen ? '336px' : '16px' }}>
+        <div className="fixed bottom-4 z-[60] flex flex-col gap-2" style={{ right: isChatOpen ? '336px' : '16px' }}>
             <div className="relative renderer-dropdown">
                 <button 
                     className={`px-3 py-1 rounded-full shadow-lg text-sm font-medium flex items-center gap-1 ${theme === 'dark' ? 'bg-slate-800 text-white hover:bg-slate-700' : 'bg-white text-slate-800 hover:bg-slate-100'}`}
