@@ -2,10 +2,11 @@ import React, { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import Viewer from './components/Viewer';
 import MolstarViewer from './components/MolstarViewer';
-import LeftPanel from './components/LeftPanel';
-import RightPanel from './components/RightPanel';
+import Panels from './components/Panels';
 import ChatPanel from './components/ChatPanel';
 import { MolecularProvider, useMolecularContext } from './context/MolecularContext';
+import { useTheme } from './context/ThemeContext';
+import { ThemeProvider } from './context/ThemeContext';
 import ErrorBanner from './components/UI/ErrorBanner';
 import ViewModeToggle from './components/UI/ViewModeToggle';
 import FloatingControls from './components/UI/FloatingControls';
@@ -16,12 +17,12 @@ function AppContent() {
     const {
         pdbContent,
         viewMode,
-        theme,
         handleDragOver,
         handleDrop,
         isChatOpen,
         setIsChatOpen
     } = useMolecularContext();
+    const { theme } = useTheme();
 
     const { t, i18n } = useTranslation();
 
@@ -44,8 +45,7 @@ function AppContent() {
                     )}
                 </ErrorBoundary>
 
-                <LeftPanel />
-                <RightPanel />
+                <Panels />
                 
                 <FooterHelp />
             </div>
@@ -56,9 +56,11 @@ function AppContent() {
 
 function App() {
     return (
-        <MolecularProvider>
-            <AppContent />
-        </MolecularProvider>
+        <ThemeProvider>
+            <MolecularProvider>
+                <AppContent />
+            </MolecularProvider>
+        </ThemeProvider>
     );
 }
 

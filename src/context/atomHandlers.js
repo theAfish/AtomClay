@@ -34,7 +34,7 @@ export function createAtomHandlers({ lattice, updateAtoms, targetElement, setSel
         });
     };
 
-    const createAtomAtCenter = () => {
+    const createAtomAtCenter = (elementOverride) => {
         try {
             const lat = lattice || [[10,0,0],[0,10,0],[0,0,10]];
             const cx = (lat[0][0] + lat[1][0] + lat[2][0]) / 2;
@@ -45,7 +45,7 @@ export function createAtomHandlers({ lattice, updateAtoms, targetElement, setSel
             updateAtoms(prev => {
                 const maxId = prev && prev.length ? Math.max(...prev.map(a => a.id)) : -1;
                 newId = maxId + 1;
-                const newAtom = { id: newId, element: targetElement, x: cx, y: cy, z: cz, layerId: activeLayerId };
+                const newAtom = { id: newId, element: elementOverride || targetElement, x: cx, y: cy, z: cz, layerId: activeLayerId };
                 return [...prev, newAtom];
             });
 

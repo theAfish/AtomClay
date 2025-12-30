@@ -6,10 +6,15 @@
 body { margin: 0; overflow: hidden; background: #0b1220; }
 #root { width: 100vw; height: 100vh; }
 canvas { display: block; outline: none; }
+/* Scrollbar variables are set from JS theme constants */
+/* WebKit browsers */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
-::-webkit-scrollbar-track { background: #0b1220; }
-::-webkit-scrollbar-thumb { background: #243544; border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: #2d4a5b; }
+::-webkit-scrollbar-track { background: var(--scrollbar-track, #f1f5f9); }
+::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb, #cbd5e1); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover, #94a3b8); }
+
+/* Firefox */
+* { scrollbar-width: thin; scrollbar-color: var(--scrollbar-thumb, #cbd5e1) var(--scrollbar-track, #f1f5f9); }
 .glass-panel {
     /* Slightly lighter than the page background, with a more visible border and soft shadow */
     background: rgba(22, 32, 46, 0.9);

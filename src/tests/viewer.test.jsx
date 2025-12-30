@@ -3,6 +3,7 @@ import { render, waitFor } from '@testing-library/react';
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import * as THREE from 'three';
 import { MolecularProvider, useMolecularContext } from '../context/MolecularContext';
+import { ThemeProvider } from '../context/ThemeContext';
 import { DEFAULTS } from '../constants/defaults';
 import Viewer from '../components/Viewer';
 
@@ -76,12 +77,14 @@ const SetAtomsThenSwitch = () => {
 describe('Viewer center update on renderer switch', () => {
     test('preserves center of scene (centroid) when switching renderers', async () => {
             const { container } = render(
-                <MolecularProvider>
-                    <>
-                        <Viewer />
-                        <SetAtomsThenSwitch />
-                    </>
-                </MolecularProvider>
+                <ThemeProvider>
+                    <MolecularProvider>
+                        <>
+                            <Viewer />
+                            <SetAtomsThenSwitch />
+                        </>
+                    </MolecularProvider>
+                </ThemeProvider>
             );
 
             // Wait for the initial renderer to be created

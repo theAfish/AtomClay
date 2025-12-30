@@ -2,17 +2,19 @@ import React, { useEffect } from 'react';
 import { Moon, Sun, ChevronDown } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useMolecularContext } from '../../context/MolecularContext';
+import { useTheme } from '../../context/ThemeContext';
 
 const FloatingControls = () => {
     const { i18n } = useTranslation();
     const { 
-        theme, setTheme, 
         showLangDropdown, setShowLangDropdown, 
         changeLanguage,
         // renderer
         currentRenderer, renderers, showRendererDropdown, setShowRendererDropdown, changeRenderer,
         isChatOpen
     } = useMolecularContext();
+
+    const { theme, setTheme } = useTheme();
 
     const languages = [
         { code: 'zh', label: '中文' },

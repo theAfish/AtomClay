@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { MessageCircle, Send, X, Copy } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useMolecularContext } from '../context/MolecularContext';
+import { useTheme } from '../context/ThemeContext';
 import { PANEL_CLASSES } from '../constants/theme';
 import { useChatAgent } from '../hooks/useChatAgent';
 import { CHAT_CONSTANTS } from '../constants/chatConstants';
@@ -10,7 +11,7 @@ import { CHAT_CONSTANTS } from '../constants/chatConstants';
 
 const ChatPanel = ({ isOpen, onToggle }) => {
     const { t } = useTranslation();
-    const { theme } = useMolecularContext();
+    const { theme } = useTheme();
     const { messages, sendMessage, isSending, statusMessage } = useChatAgent();
     const [inputMessage, setInputMessage] = useState('');
     const [isAtBottom, setIsAtBottom] = useState(true);

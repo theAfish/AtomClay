@@ -242,24 +242,51 @@ export function createThreeRenderer() {
                 }
 
                 for (let i=0;i<visibleAtoms.length;i++){
-                    for (let j=i+1;j<visibleAtoms.length;j++){
-                        const p1=[visibleAtoms[i].x,visibleAtoms[i].y,visibleAtoms[i].z];
-                        const p2=[visibleAtoms[j].x,visibleAtoms[j].y,visibleAtoms[j].z];
-                        let distVector=[p2[0]-p1[0],p2[1]-p1[1],p2[2]-p1[2]];
-                        if (invLatMat && latMat) {
-                            const frac = MathUtils.multiplyMatrixVector(invLatMat, distVector);
-                            const fracMic = [ frac[0]-Math.floor(frac[0]+0.5), frac[1]-Math.floor(frac[1]+0.5), frac[2]-Math.floor(frac[2]+0.5) ];
-                            distVector = MathUtils.multiplyMatrixVector(latMat, fracMic);
-                        }
-                        const distSq = distVector[0]**2 + distVector[1]**2 + distVector[2]**2;
-                        if (distSq < 1e-6) continue;
-                        const r1 = getVdw(visibleAtoms[i].element);
+                    const p1=[visibleAtoms[i].x,visibleAtoms[i].y,visibleAtoms[i].z];
+                    const r1 = getVdw(visibleAtoms[i].element);
+                    for (let j=i;j<visibleAtoms.length;j++){
+                        const p2Base=[visibleAtoms[j].x,visibleAtoms[j].y,visibleAtoms[j].z];
                         const r2 = getVdw(visibleAtoms[j].element);
-                        const threshold = (r1 + r2) * DEFAULTS.VISUALS.BOND_THRESHOLD_FACTOR;
-                        if (distSq < threshold**2) {
-                            const halfVec = [distVector[0]*0.5, distVector[1]*0.5, distVector[2]*0.5];
-                            bondSegments.push({ start: new THREE.Vector3(...p1), end: new THREE.Vector3(p1[0]+halfVec[0], p1[1]+halfVec[1], p1[2]+halfVec[2]), color: new THREE.Color(getElementProp(visibleAtoms[i].element).color) });
-                            bondSegments.push({ start: new THREE.Vector3(...p2), end: new THREE.Vector3(p2[0]-halfVec[0], p2[1]-halfVec[1], p2[2]-halfVec[2]), color: new THREE.Color(getElementProp(visibleAtoms[j].element).color) });
+                        // enumerate nearby periodic images (nx,ny,nz in [-1,1]) so multiple periodic-image bonds may be captured
+                        const maxOffset = 1;
+                        for (let nx=-maxOffset; nx<=maxOffset; nx++){
+                            for (let ny=-maxOffset; ny<=maxOffset; ny++){
+                                for (let nz=-maxOffset; nz<=maxOffset; nz++){
+                                    // skip trivial zero-offset self-image
+                                    if (i===j && nx===0 && ny===0 && nz===0) continue;
+                                    let p2 = p2Base.slice();
+                                    if (latMat) {
+                                        // apply lattice translation
+                                        p2 = [
+                                            p2Base[0] + nx * lattice[0][0] + ny * lattice[1][0] + nz * lattice[2][0],
+                                            p2Base[1] + nx * lattice[0][1] + ny * lattice[1][1] + nz * lattice[2][1],
+                                            p2Base[2] + nx * lattice[0][2] + ny * lattice[1][2] + nz * lattice[2][2]
+                                        ];
+                                    } else {
+                                        // non-periodic: only zero-offset makes sense
+                                        if (nx!==0 || ny!==0 || nz!==0) continue;
+                                    }
+                                    const distVector=[p2[0]-p1[0],p2[1]-p1[1],p2[2]-p1[2]];
+                                    const distSq = distVector[0]**2 + distVector[1]**2 + distVector[2]**2;
+                                    if (distSq < 1e-6) continue;
+                                    const threshold = (r1 + r2) * DEFAULTS.VISUALS.BOND_THRESHOLD_FACTOR;
+                                    if (distSq < threshold**2) {
+                                        const halfVec = [distVector[0]*0.5, distVector[1]*0.5, distVector[2]*0.5];
+                                        // midpoint on i-side (toward the image of j)
+                                        const midI = new THREE.Vector3(p1[0] + halfVec[0], p1[1] + halfVec[1], p1[2] + halfVec[2]);
+                                        // compute translation vector T used to move p2Base -> p2
+                                        const T = [p2[0] - p2Base[0], p2[1] - p2Base[1], p2[2] - p2Base[2]];
+                                        // corresponding image of p1 in j's cell: p1_image = p1 - T
+                                        const p1Image = [p1[0] - T[0], p1[1] - T[1], p1[2] - T[2]];
+                                        // midpoint on j-side (toward the image of i)
+                                        const midJ = new THREE.Vector3(p2Base[0] + 0.5*(p1Image[0] - p2Base[0]), p2Base[1] + 0.5*(p1Image[1] - p2Base[1]), p2Base[2] + 0.5*(p1Image[2] - p2Base[2]));
+                                        // attach first half to displayed position of atom i
+                                        bondSegments.push({ start: new THREE.Vector3(...p1), end: midI.clone(), color: new THREE.Color(getElementProp(visibleAtoms[i].element).color) });
+                                        // attach second half to the displayed position of atom j (p2Base), pointing toward the boundary
+                                        bondSegments.push({ start: new THREE.Vector3(...p2Base), end: midJ.clone(), color: new THREE.Color(getElementProp(visibleAtoms[j].element).color) });
+                                    }
+                                }
+                            }
                         }
                     }
                 }

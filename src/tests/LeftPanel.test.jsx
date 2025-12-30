@@ -2,7 +2,8 @@ import React from 'react';
 import { describe, it, expect } from 'vitest';
 import { render, fireEvent } from '@testing-library/react';
 import { MolecularProvider } from '../context/MolecularContext';
-import RightPanel from '../components/RightPanel';
+import { ThemeProvider } from '../context/ThemeContext';
+import Panels from '../components/Panels';
 import i18n from '../i18n';
 import { I18nextProvider } from 'react-i18next';
 
@@ -12,15 +13,19 @@ describe('Layers panel rename UI (moved to right panel)', () => {
         i18n.changeLanguage('en');
         const { findByTitle, getByText, getAllByText, container } = render(
             <I18nextProvider i18n={i18n}>
-                <MolecularProvider>
-                    <RightPanel />
-                </MolecularProvider>
+                <ThemeProvider>
+                    <MolecularProvider>
+                        <Panels />
+                    </MolecularProvider>
+                </ThemeProvider>
             </I18nextProvider>
         );
 
         // Double-click the layer label to start editing — this is in the right panel now
         const labels = getAllByText('Layer 1');
-        const label = labels.find(el => el.classList && el.classList.contains('truncate')) || labels[0];
+        // Find the one in the layers panel (not the top-left fixed panel)
+        const layerLabels = labels.filter(el => el.closest('[class*="space-y-2"]'));
+        const label = layerLabels.find(el => el.classList && el.classList.contains('truncate')) || layerLabels[0];
         expect(label).toBeTruthy();
         fireEvent.doubleClick(label);
 

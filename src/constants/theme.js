@@ -83,6 +83,10 @@ export const PANEL_CLASSES = {
         textNoLattice: 'text-slate-400',
         buttonPreset: 'bg-slate-700',
         borderInput: 'border-slate-600',
+        // Scrollbar colors
+        scrollbarTrack: '#0b1220',
+        scrollbarThumb: '#243544',
+        scrollbarThumbHover: '#2d4a5b',
     },
     light: {
         panelClass: 'bg-white/90 backdrop-blur-xl border border-slate-200',
@@ -126,5 +130,9 @@ export const PANEL_CLASSES = {
         textNoLattice: 'text-slate-400',
         buttonPreset: 'bg-gray-200',
         borderInput: 'border-slate-300',
+        // Scrollbar colors
+        scrollbarTrack: '#f1f5f9',
+        scrollbarThumb: '#cbd5e1',
+        scrollbarThumbHover: '#94a3b8',
     }
 };

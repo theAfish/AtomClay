@@ -48,7 +48,6 @@ export const MolecularProvider = ({ children }) => {
     const [fileError, setFileError] = useState(null);
     const [pdbContent, setPdbContent] = useState(null);
     const [viewMode, setViewMode] = useState('default'); // 'default' | 'protein'
-    const [theme, setTheme] = useState('dark'); // 'dark' | 'light'
     const [showLangDropdown, setShowLangDropdown] = useState(false);
     // Renderer selection
     const [currentRenderer, setCurrentRenderer] = useState('three'); // 'three' | 'molstar' | 'canvas'
@@ -456,7 +455,6 @@ export const MolecularProvider = ({ children }) => {
         fileError, setFileError,
         pdbContent, setPdbContent,
         viewMode, setViewMode,
-        theme, setTheme,
         showLangDropdown, setShowLangDropdown,
         isChatOpen, setIsChatOpen,
         

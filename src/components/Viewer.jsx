@@ -4,6 +4,7 @@ import { COLORS } from '../constants/theme';
 import { DEFAULTS } from '../constants/defaults';
 import { MathUtils } from '../utils/math';
 import { useMolecularContext } from '../context/MolecularContext';
+import { useTheme } from '../context/ThemeContext';
 import { useGizmo } from '../hooks/useGizmo';
 import { useBoxSelection } from '../hooks/useBoxSelection';
 import { handleDraggingChanged, handleTransformChange } from './operations/transformHandlers';
@@ -16,8 +17,9 @@ const Viewer = () => {
     const {
         atoms, lattice, layers, activeLayerId,
         selectedAtomIds, onAtomClick, onAtomsMoveEnd, onBoxSelect,
-        transformMode, editMode, theme, currentRenderer, isChatOpen
+        transformMode, editMode, currentRenderer, isChatOpen
     } = useMolecularContext();
+    const { theme } = useTheme();
 
     const containerRef = useRef(null);
     const rendererRef = useRef(null);
