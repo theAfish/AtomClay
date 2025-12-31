@@ -39,6 +39,73 @@ const DraggablePanel = ({
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
+    // Keep track of last seen initial props so we only reposition when they change
+    const prevInitialXRef = useRef(initialX);
+    const prevInitialYRef = useRef(initialY);
+    // Track whether the user manually moved the panel
+    const hasUserMovedRef = useRef(false);
+    // Track start position when dragging begins so we can detect actual movement
+    const dragStartRef = useRef(null);
+
+    useEffect(() => {
+        // Don't interfere while the user is actively interacting
+        if (isDragging || isResizing) return;
+
+        // If the parent changed the initial position (e.g., chat opened/closed)
+        const initialChanged = initialX !== prevInitialXRef.current || initialY !== prevInitialYRef.current;
+
+        if (initialChanged) {
+            if (!hasUserMovedRef.current) {
+                // If user never moved the panel, snap to the new initial
+                const clampedX = Math.max(0, Math.min(initialX, windowSize.width - size.width));
+                const clampedY = Math.max(0, Math.min(initialY, windowSize.height - size.height));
+
+                setPosition({
+                    xPercent: (clampedX / windowSize.width) * 100,
+                    yPercent: (clampedY / windowSize.height) * 100
+                });
+            } else {
+                // If user moved the panel, shift it by the same delta the initial position changed by
+                const deltaX = initialX - prevInitialXRef.current;
+                const deltaY = initialY - prevInitialYRef.current;
+
+                const deltaPercentX = (deltaX / windowSize.width) * 100;
+                const deltaPercentY = (deltaY / windowSize.height) * 100;
+
+                const newXPercent = position.xPercent + deltaPercentX;
+                const newYPercent = position.yPercent + deltaPercentY;
+
+                const actualX = (newXPercent / 100) * windowSize.width;
+                const actualY = (newYPercent / 100) * windowSize.height;
+
+                const clampedX = Math.max(0, Math.min(actualX, windowSize.width - size.width));
+                const clampedY = Math.max(0, Math.min(actualY, windowSize.height - size.height));
+
+                setPosition({
+                    xPercent: (clampedX / windowSize.width) * 100,
+                    yPercent: (clampedY / windowSize.height) * 100
+                });
+            }
+
+            prevInitialXRef.current = initialX;
+            prevInitialYRef.current = initialY;
+            return;
+        }
+
+        // Otherwise, keep current relative position but ensure it stays inside the viewport
+        const actualX = (position.xPercent / 100) * windowSize.width;
+        const actualY = (position.yPercent / 100) * windowSize.height;
+        const clampedX = Math.max(0, Math.min(actualX, windowSize.width - size.width));
+        const clampedY = Math.max(0, Math.min(actualY, windowSize.height - size.height));
+
+        if (clampedX !== actualX || clampedY !== actualY) {
+            setPosition({
+                xPercent: (clampedX / windowSize.width) * 100,
+                yPercent: (clampedY / windowSize.height) * 100
+            });
+        }
+    }, [initialX, initialY, windowSize.width, windowSize.height, size.width, size.height, isDragging, isResizing, position.xPercent, position.yPercent]);
+
     useEffect(() => {
         const handleMouseMove = (e) => {
             if (isDragging) {
@@ -62,6 +129,15 @@ const DraggablePanel = ({
         };
 
         const handleMouseUp = () => {
+            // If we started dragging and the position changed, mark that the user moved the panel
+            if (dragStartRef.current) {
+                const start = dragStartRef.current;
+                if (start.xPercent !== position.xPercent || start.yPercent !== position.yPercent) {
+                    hasUserMovedRef.current = true;
+                }
+                dragStartRef.current = null;
+            }
+
             setIsDragging(false);
             setIsResizing(false);
         };
@@ -82,6 +158,8 @@ const DraggablePanel = ({
         if (e.target.closest('.drag-handle')) {
             const actualX = (position.xPercent / 100) * windowSize.width;
             const actualY = (position.yPercent / 100) * windowSize.height;
+            // Save the start position to detect actual movement on mouseup
+            dragStartRef.current = { xPercent: position.xPercent, yPercent: position.yPercent };
             setIsDragging(true);
             setDragOffset({
                 x: e.clientX - actualX,

@@ -16,11 +16,12 @@ const LayerNameEditor = ({ layer, onRename, onEditingChange, className = '', inp
     if (!layer) return <>{'None'}</>;
 
     return editing ? (
-        <span className={`inline-flex items-center gap-2 ${className}`}>
+        <span className={`inline-flex items-center gap-2 w-full ${className}`}>
             <input
                 autoFocus
                 type="text"
                 value={name}
+                onClick={(e) => e.stopPropagation()}
                 onChange={(e) => setName(e.target.value)}
                 onKeyDown={(e) => {
                     if (e.key === 'Enter') {
@@ -32,24 +33,26 @@ const LayerNameEditor = ({ layer, onRename, onEditingChange, className = '', inp
                         setName(layer.name);
                     }
                 }}
-                className={`flex-1 min-w-0 max-w-[200px] h-6 leading-tight text-sm ${inputClass}`}
+                className={`flex-1 min-w-0 w-full h-6 leading-tight text-sm ${inputClass}`}
             />
             <button
-                onClick={() => {
+                onClick={(e) => {
+                    e.stopPropagation();
                     onRename && onRename(layer.id, name || layer.name);
                     setEditing(false);
                 }}
-                className="p-1"
+                className="p-1 flex-shrink-0"
                 title="Save"
             >
                 <Check size={14} />
             </button>
             <button
-                onClick={() => {
+                onClick={(e) => {
+                    e.stopPropagation();
                     setEditing(false);
                     setName(layer.name);
                 }}
-                className="p-1"
+                className="p-1 flex-shrink-0"
                 title="Cancel"
             >
                 <X size={14} />
