@@ -7,6 +7,9 @@ import react from '@vitejs/plugin-react'
 export default defineConfig(({ command }) => {
   const config = {
     plugins: [react()],
+    optimizeDeps: {
+      exclude: ['kekule']
+    },
     base: '/',
     server: {
       proxy: {

@@ -17,7 +17,7 @@ Provided files:
   Additionally, there is a new shader-based renderer implementation:
   - `customShaders.js`: contains GLSL vertex/fragment strings and helper functions to create ShaderMaterials for atoms and bonds. These expose `createAtomMaterial` and `createBondMaterial`.
   - `customRenderer.js`: a renderer factory (`createCustomRenderer`) that uses the shader materials to render atoms and bonds using `InstancedMesh` and the same general API as `threeRenderer`.
-    - Note: to use the shader renderer in the app, choose the "Shader" entry in the renderer dropdown (Floating Controls).
+    - Note: to use the shader renderer in the app, choose one of the shader variants in the renderer dropdown (Floating Controls): `Cartoon` or `Plastic`.
       The context's `renderers` list includes `custom` as `Shader`; the `Viewer` will re-initialize the renderer when the dropdown is changed.
 
 How to migrate `Viewer.jsx` to use the renderer API
@@ -36,3 +36,13 @@ Notes
 - The implementation is intentionally self-contained and can be extended to
   expose more hooks/events (e.g., per-frame callbacks) or to provide alternate
   renderer backends.
+
+
+
+
+✅ Plastic style implemented in `customShaders.js` (use `style: 'plastic'`).
+- How to enable:
+  - At init: `renderer.init(container, { ..., atomStyle: 'plastic' })`
+  - Or at runtime: `renderer.setAtomStyle('plastic')`
+
+This shader uses a half-Lambert diffuse term, Blinn-Phong-like specular for a "plastic" look, and a Fresnel-based dark rim to give crisp black outlines.

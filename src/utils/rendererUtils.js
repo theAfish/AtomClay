@@ -26,9 +26,17 @@ export const initializeRenderer = (containerRef, currentRenderer, onAtomClick, o
         rendererRef.current = null;
     }
 
-    const rendererApi = currentRenderer === 'custom' ? createCustomRenderer() : createThreeRenderer();
+    // Determine atomStyle when using the custom renderer. Support explicit variants (custom-toon/custom-plastic)
+    let atomStyle;
+    // Map renderer id to atom style. Support both legacy and new ids.
+    if (currentRenderer === 'custom-toon' || currentRenderer === 'custom-cartoon') atomStyle = 'toon';
+    else if (currentRenderer === 'custom-plastic') atomStyle = 'plastic';
+    else if (currentRenderer === 'custom') atomStyle = 'plastic'; // legacy fallback
+
+    const rendererApi = currentRenderer && currentRenderer.startsWith('custom') ? createCustomRenderer() : createThreeRenderer();
     rendererRef.current = rendererApi;
-    rendererApi.init(containerRef.current, { onAtomClick, onAtomsMoveEnd, onBoxSelect, theme, lattice });
+    // Pass atomStyle into init when available so renderer can choose shader
+    rendererApi.init(containerRef.current, { onAtomClick, onAtomsMoveEnd, onBoxSelect, theme, lattice, atomStyle });
 
     // Replace our threeRef.current with renderer's internal threeRef object so
     // existing hooks and logic continue to work.

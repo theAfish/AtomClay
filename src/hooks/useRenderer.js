@@ -28,9 +28,15 @@ export const useRenderer = (containerRef, currentRenderer, onAtomClick, onAtomsM
             rendererRef.current = null;
         }
 
-        const rendererApi = currentRenderer === 'custom' ? createCustomRenderer() : createThreeRenderer();
+        // Map renderer id to atom style for shader variants
+        let atomStyle;
+        if (currentRenderer === 'custom-toon' || currentRenderer === 'custom-cartoon') atomStyle = 'toon';
+        else if (currentRenderer === 'custom-plastic') atomStyle = 'plastic';
+        else if (currentRenderer === 'custom') atomStyle = 'plastic'; // legacy
+
+        const rendererApi = currentRenderer && currentRenderer.startsWith('custom') ? createCustomRenderer() : createThreeRenderer();
         rendererRef.current = rendererApi;
-        rendererApi.init(containerRef.current, { onAtomClick, onAtomsMoveEnd, onBoxSelect, theme, lattice });
+        rendererApi.init(containerRef.current, { onAtomClick, onAtomsMoveEnd, onBoxSelect, theme, lattice, atomStyle });
 
         // Replace our threeRef.current with renderer's internal threeRef object
         threeRef.current = rendererApi.threeRef;

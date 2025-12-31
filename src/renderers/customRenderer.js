@@ -35,7 +35,8 @@ export function createCustomRenderer() {
         currentOutlineColor: new THREE.Color(),
         targetOutlineColor: new THREE.Color(),
         outlineMaterials: [],
-        themeTransitionSpeed: 0.05 // Adjust for smoothness
+        themeTransitionSpeed: 0.05, // Adjust for smoothness
+        atomStyle: 'plastic' // default style; 'plastic' implemented
     };
 
     let animationId = null;
@@ -45,7 +46,7 @@ export function createCustomRenderer() {
     const api = {
         threeRef,
 
-        init(container, { onAtomClick, onAtomsMoveEnd, onBoxSelect, theme, lattice } = {}) {
+        init(container, { onAtomClick, onAtomsMoveEnd, onBoxSelect, theme, lattice, atomStyle } = {}) {
             const width = container.clientWidth;
             const height = container.clientHeight;
 
@@ -94,6 +95,8 @@ export function createCustomRenderer() {
             threeRef.instanceIdToAtomId = [];
             threeRef.atomIdToInstanceId.clear && threeRef.atomIdToInstanceId.clear();
             threeRef.lattice = lattice || null;
+            // atomStyle may be provided at init time, default to previously configured value
+            threeRef.atomStyle = typeof atomStyle === 'string' ? atomStyle : threeRef.atomStyle;
 
             resizeHandler = createResizeHandler(container, camera, renderer);
             window.addEventListener('resize', resizeHandler);
@@ -189,7 +192,7 @@ export function createCustomRenderer() {
                 outlineInstMesh.material.needsUpdate = true;
                 threeRef.outlineMaterials.push(outlineInstMesh.material);
 
-                const instMesh = new THREE.InstancedMesh(sphereGeo, createAtomMaterial({}), visibleAtoms.length);
+                const instMesh = new THREE.InstancedMesh(sphereGeo, createAtomMaterial({ style: threeRef.atomStyle }), visibleAtoms.length);
                 // Tell material to support instancing via define
                 instMesh.material.defines = Object.assign({}, instMesh.material.defines, { USE_INSTANCING: 1 });
                 instMesh.material.needsUpdate = true;
@@ -230,7 +233,7 @@ export function createCustomRenderer() {
                     scene.add(outlineMesh);
                     threeRef.outlineMaterials.push(outlineMat);
 
-                    const mat = createAtomMaterial({ color: new THREE.Color(prop.color) });
+                    const mat = createAtomMaterial({ color: new THREE.Color(prop.color), style: threeRef.atomStyle });
                     const mesh = new THREE.Mesh(sphereGeo, mat);
                     mesh.position.set(atom.x, atom.y, atom.z);
                     mesh.scale.setScalar(scale);
@@ -389,6 +392,14 @@ export function createCustomRenderer() {
                 }
                 try { if (transformMode === 'rotate') transformControl.setSpace('local'); else transformControl.setSpace('world'); } catch(e) {}
             }
+        },
+
+        // Change the atom material style (e.g., 'plastic' or 'toon') and rebuild scene materials
+        setAtomStyle(style) {
+            if (typeof style !== 'string') return;
+            threeRef.atomStyle = style;
+            // Re-sync scene so atom materials are recreated with the new style
+            try { api.syncScene(api._latestProps); } catch (e) {}
         },
 
         resize() {

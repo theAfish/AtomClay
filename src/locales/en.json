@@ -46,5 +46,9 @@
   "Chemical Formula": "Chemical Formula",
   "Lattice Vectors": "Lattice Vectors",
   "Cell Volume": "Cell Volume",
-  "No lattice information": "No lattice information"
+  "No lattice information": "No lattice information",
+  "Add": "Add",
+  "Add Atom": "Add Atom",
+  "Add Molecule": "Add Molecule",
+  "Open Sketcher": "Open Sketcher"
 }

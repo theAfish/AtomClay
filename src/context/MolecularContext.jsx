@@ -294,7 +294,8 @@ export const MolecularProvider = ({ children }) => {
 
     const renderers = [
         { id: 'three', label: 'Three.js' },
-        { id: 'custom', label: 'Shader' }
+        { id: 'custom-cartoon', label: 'Cartoon' },
+        { id: 'custom-plastic', label: 'Plastic' }
     ];
 
     const changeRenderer = (id) => {

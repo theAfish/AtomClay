@@ -16,6 +16,7 @@ import InterfaceForm from './operations/InterfaceForm';
 import LayersList from './LayersList';
 import DraggablePanel from './UI/DraggablePanel';
 import ElementSelector from './UI/ElementSelector';
+import MoleculeSketcher from './MoleculeSketcher';
 
 const Panels = () => {
     const { t } = useTranslation();
@@ -60,6 +61,43 @@ const Panels = () => {
     const [editingName, setEditingName] = useState('');
 
     const [addSubMode, setAddSubMode] = useState(null);
+    const [showSketcher, setShowSketcher] = useState(false);
+
+    const handleMoleculeSave = (newAtoms) => {
+        // Create a proper layer id string (follow app convention)
+        const newLayerId = `layer-${Date.now()}`;
+        const maxAtomId = atoms && atoms.length ? Math.max(...atoms.map(a => a.id)) : -1;
+
+        const atomsWithIds = newAtoms.map((a, idx) => ({
+            ...a,
+            id: maxAtomId + 1 + idx,
+            layerId: newLayerId
+        }));
+
+        const newLayer = {
+            id: newLayerId,
+            name: `Molecule ${layers.length + 1}`,
+            visible: true,
+            selected: true,
+            opacity: 1,
+            lattice: null,
+            color: '#ff0000',
+            type: 'molecule'
+        };
+
+        // Insert new layer at the front like other imports
+        setLayers(prev => [newLayer, ...prev]);
+        updateAtoms(prev => [...prev, ...atomsWithIds]);
+        setActiveLayerId(newLayerId);
+        // Select the newly added atoms so they can be edited/deleted right away
+        // extract their ids
+        const newIds = atomsWithIds.map(a => a.id);
+        setSelectedAtomIds(newIds);
+        setEditMode('SELECT');
+        setTransformMode('translate');
+        setShowSketcher(false);
+        setAddSubMode(null);
+    };
 
     const selectedCount = selectedAtomIds.length;
     const selAtom = selectedCount === 1 ? atoms.find(a => a.id === selectedAtomIds[0]) : null;
@@ -221,6 +259,14 @@ const Panels = () => {
                                     </button>
                                 </div>
                                 
+                                {addSubMode === 'molecule' && (
+                                    <div className={`p-2 rounded ${panels.bgCard} border ${borderClass} animate-fade-in mb-2`}>
+                                        <button onClick={() => setShowSketcher(true)} className={`w-full ${buttonPrimary} py-2 rounded text-xs flex items-center justify-center gap-2`}>
+                                            <Box size={14} /> {t('Open Sketcher')}
+                                        </button>
+                                    </div>
+                                )}
+
                                 {addSubMode === 'atom' && (
                                     <div className={`p-2 rounded ${panels.bgCard} border ${borderClass} animate-fade-in`}>
                                         <div className={`text-xs font-bold mb-2 ${textLayerInfo}`}>{t('Select Element')}</div>
@@ -300,6 +346,13 @@ const Panels = () => {
                     </div>
                 </div>
             </DraggablePanel>
+
+            {showSketcher && (
+                <MoleculeSketcher 
+                    onSave={handleMoleculeSave} 
+                    onCancel={() => setShowSketcher(false)} 
+                />
+            )}
 
             {/* Layers Panel (Right) */}
             <DraggablePanel 
