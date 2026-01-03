@@ -35,7 +35,8 @@ const Panels = () => {
         createAtomAtCenter,
         saveStateToHistory, currentLatticeSourceId,
         isChatOpen,
-        agentReviewState, acceptAgentResult, denyAgentResult, handleLayerReviewAction
+        agentReviewState, acceptAgentResult, denyAgentResult, handleLayerReviewAction,
+        moveAtomsWithLattice, setMoveAtomsWithLattice
     } = useMolecularContext();
     const { theme } = useTheme();
 
@@ -245,6 +246,9 @@ const Panels = () => {
                             <button onClick={()=>setEditMode('ADD')} className={`flex-1 py-2 rounded text-xs flex flex-col items-center gap-1 ${editMode==='ADD'?buttonPrimary:textMuted}`}>
                                 <PlusSquare size={14} /> {t('Add')}
                             </button>
+                            <button onClick={()=>setEditMode('LATTICE')} className={`flex-1 py-2 rounded text-xs flex flex-col items-center gap-1 ${editMode==='LATTICE'?buttonPrimary:textMuted}`}>
+                                <Expand size={14} /> {t('Lattice')}
+                            </button>
                         </div>
 
                         {/* Add Mode Buttons - visible only when in ADD mode */}
@@ -298,6 +302,16 @@ const Panels = () => {
                                 <button onClick={()=>setTransformMode('scale')} className={`flex-1 py-2 rounded text-xs flex flex-col items-center gap-1 ${transformMode==='scale'?buttonPrimary:textMuted}`}>
                                     <Maximize2 size={14} /> {t('Scale')}
                                 </button>
+                            </div>
+                        )}
+
+                        {/* Lattice Mode Controls */}
+                        {editMode === 'LATTICE' && (
+                            <div className={`p-2 rounded ${panels.bgCard} border ${borderClass} animate-fade-in mb-2`}>
+                                <label className="flex items-center gap-2 text-xs">
+                                    <input type="checkbox" checked={moveAtomsWithLattice} onChange={() => setMoveAtomsWithLattice(!moveAtomsWithLattice)} />
+                                    <span className="ml-2">{t('Move atoms with lattice (keep fractional coords)')}</span>
+                                </label>
                             </div>
                         )}
 

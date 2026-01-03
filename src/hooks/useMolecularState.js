@@ -110,8 +110,10 @@ export function useMolecularState() {
         return () => window.removeEventListener('keydown', handler);
     }, [undo, redo]);
 
-    const setLattice = useCallback((newLattice, sourceId = null) => {
-        saveStateToHistory(atoms, lattice, layers, activeLayerId, currentLatticeSourceId);
+    const setLattice = useCallback((newLattice, sourceId = null, skipHistory = false) => {
+        if (!skipHistory) {
+            saveStateToHistory(atoms, lattice, layers, activeLayerId, currentLatticeSourceId);
+        }
         setCurrentLattice(newLattice);
         if (sourceId) setCurrentLatticeSourceId(sourceId);
     }, [atoms, lattice, layers, activeLayerId, currentLatticeSourceId, saveStateToHistory]);

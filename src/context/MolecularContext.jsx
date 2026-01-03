@@ -55,6 +55,9 @@ export const MolecularProvider = ({ children }) => {
     // Chat panel
     const [isChatOpen, setIsChatOpen] = useState(false);
 
+    // Whether lattice edits also move atoms (keep fractional coordinates)
+    const [moveAtomsWithLattice, setMoveAtomsWithLattice] = useState(true);
+
     // Clear selection when active layer changes
     useEffect(() => {
         setSelectedAtomIds([]);
@@ -458,6 +461,7 @@ export const MolecularProvider = ({ children }) => {
         viewMode, setViewMode,
         showLangDropdown, setShowLangDropdown,
         isChatOpen, setIsChatOpen,
+        moveAtomsWithLattice, setMoveAtomsWithLattice,
         
         // Handlers
         handleLoad,

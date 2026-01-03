@@ -6,6 +6,7 @@ import { MathUtils } from '../utils/math';
 import { useMolecularContext } from '../context/MolecularContext';
 import { useTheme } from '../context/ThemeContext';
 import { useGizmo } from '../hooks/useGizmo';
+import { useLatticeGizmo } from '../hooks/useLatticeGizmo';
 import { useBoxSelection } from '../hooks/useBoxSelection';
 import { handleDraggingChanged, handleTransformChange } from './operations/transformHandlers';
 import { updateControlAttachment } from './operations/transformAttachment';
@@ -15,11 +16,13 @@ import { updateSelectionVisuals } from '../utils/selectionUtils';
 
 const Viewer = () => {
     const {
-        atoms, lattice, layers, activeLayerId,
+        atoms, lattice, setLattice, setAtoms, layers, activeLayerId,
         selectedAtomIds, onAtomClick, onAtomsMoveEnd, onBoxSelect,
-        transformMode, editMode, currentRenderer, isChatOpen
+        transformMode, editMode, currentRenderer, isChatOpen, moveAtomsWithLattice
     } = useMolecularContext();
     const { theme } = useTheme();
+
+    const [rendererVersion, setRendererVersion] = useState(0);
 
     const containerRef = useRef(null);
     const rendererRef = useRef(null);
@@ -53,6 +56,7 @@ const Viewer = () => {
 
     // Custom Hooks
     const drawGizmo = useGizmo(containerRef, threeRef, theme, lattice);
+    useLatticeGizmo(threeRef, lattice, setLattice, editMode, rendererVersion, moveAtomsWithLattice, setAtoms, atoms);
     const selectionBox = useBoxSelection(containerRef, threeRef, atoms, activeLayerId, onBoxSelect);
 
     // Keep a ref to the latest drawGizmo function so the renderer's animate loop can call it
@@ -64,7 +68,9 @@ const Viewer = () => {
 
     // Initialize renderer (three-based) and wire up callbacks (re-init when `currentRenderer` changes)
     useEffect(() => {
-        return initializeRenderer(containerRef, currentRenderer, onAtomClick, onAtomsMoveEnd, onBoxSelect, theme, lattice, drawGizmoRef, latestProps, atoms, layers, activeLayerId, rendererRef, threeRef, transformMode, editMode);
+        const cleanup = initializeRenderer(containerRef, currentRenderer, onAtomClick, onAtomsMoveEnd, onBoxSelect, theme, lattice, drawGizmoRef, latestProps, atoms, layers, activeLayerId, rendererRef, threeRef, transformMode, editMode);
+        setRendererVersion(v => v + 1);
+        return cleanup;
     }, [currentRenderer]); // Re-init when renderer changes
 
 
