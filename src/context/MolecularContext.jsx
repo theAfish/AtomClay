@@ -448,6 +448,13 @@ export const MolecularProvider = ({ children }) => {
         setAtoms([]);
     }, [setAtoms]);
 
+    // Delete selected atoms helper
+    const deleteSelectedAtoms = () => {
+        if (!selectedAtomIds || selectedAtomIds.length === 0) return;
+        updateAtoms(prev => prev.filter(a => !selectedAtomIds.includes(a.id)));
+        setSelectedAtomIds([]);
+    };
+
     const value = {
         // Molecular State
         ...molecularState,
@@ -475,6 +482,7 @@ export const MolecularProvider = ({ children }) => {
         onAtomClick,
         onBoxSelect,
         onAtomsMoveEnd,
+        deleteSelectedAtoms,
         handleDragOver,
         handleDrop,
         changeLanguage,
