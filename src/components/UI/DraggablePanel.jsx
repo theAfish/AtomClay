@@ -46,6 +46,8 @@ const DraggablePanel = ({
     const hasUserMovedRef = useRef(false);
     // Track start position when dragging begins so we can detect actual movement
     const dragStartRef = useRef(null);
+    // Track pointer id when using Pointer Events
+    const pointerIdRef = useRef(null);
 
     useEffect(() => {
         // Don't interfere while the user is actively interacting
@@ -107,7 +109,7 @@ const DraggablePanel = ({
     }, [initialX, initialY, windowSize.width, windowSize.height, size.width, size.height, isDragging, isResizing, position.xPercent, position.yPercent]);
 
     useEffect(() => {
-        const handleMouseMove = (e) => {
+        const handlePointerMove = (e) => {
             if (isDragging) {
                 let newX = e.clientX - dragOffset.x;
                 let newY = e.clientY - dragOffset.y;
@@ -128,7 +130,7 @@ const DraggablePanel = ({
             }
         };
 
-        const handleMouseUp = () => {
+        const handlePointerUp = (e) => {
             // If we started dragging and the position changed, mark that the user moved the panel
             if (dragStartRef.current) {
                 const start = dragStartRef.current;
@@ -140,38 +142,57 @@ const DraggablePanel = ({
 
             setIsDragging(false);
             setIsResizing(false);
+
+            if (pointerIdRef.current && panelRef.current && typeof panelRef.current.releasePointerCapture === 'function') {
+                try { panelRef.current.releasePointerCapture(pointerIdRef.current); } catch (err) {}
+            }
+            pointerIdRef.current = null;
         };
 
         if (isDragging || isResizing) {
-            document.addEventListener('mousemove', handleMouseMove);
-            document.addEventListener('mouseup', handleMouseUp);
+            document.addEventListener('pointermove', handlePointerMove);
+            document.addEventListener('pointerup', handlePointerUp);
+            document.addEventListener('pointercancel', handlePointerUp);
         }
 
         return () => {
-            document.removeEventListener('mousemove', handleMouseMove);
-            document.removeEventListener('mouseup', handleMouseUp);
+            document.removeEventListener('pointermove', handlePointerMove);
+            document.removeEventListener('pointerup', handlePointerUp);
+            document.removeEventListener('pointercancel', handlePointerUp);
         };
     }, [isDragging, isResizing, dragOffset, position, size, windowSize, minWidth, minHeight]);
 
-    const handleMouseDown = (e) => {
+    const handlePointerDown = (e) => {
         // Only start drag if clicking on the header (which has the drag-handle class)
         if (e.target.closest('.drag-handle')) {
+            e.preventDefault();
             const actualX = (position.xPercent / 100) * windowSize.width;
             const actualY = (position.yPercent / 100) * windowSize.height;
-            // Save the start position to detect actual movement on mouseup
+            // Save the start position to detect actual movement on pointerup
             dragStartRef.current = { xPercent: position.xPercent, yPercent: position.yPercent };
             setIsDragging(true);
             setDragOffset({
                 x: e.clientX - actualX,
                 y: e.clientY - actualY
             });
+            // Capture the pointer so we continue getting events even if the pointer leaves the element
+            pointerIdRef.current = e.pointerId;
+            if (panelRef.current && typeof panelRef.current.setPointerCapture === 'function') {
+                try { panelRef.current.setPointerCapture(e.pointerId); } catch (err) {}
+            }
         }
-    };
+    }; 
 
-    const handleResizeMouseDown = (e) => {
+    const handleResizePointerDown = (e) => {
         e.stopPropagation();
+        e.preventDefault();
         setIsResizing(true);
-    };
+        // Capture pointer for resize
+        pointerIdRef.current = e.pointerId;
+        if (panelRef.current && typeof panelRef.current.setPointerCapture === 'function') {
+            try { panelRef.current.setPointerCapture(e.pointerId); } catch (err) {}
+        }
+    }; 
 
     // Basic theme styles if not provided via classes
     const bgClass = theme === 'dark' ? 'bg-gray-900 border-gray-700 text-gray-100' : 'bg-white border-gray-200 text-gray-800';
@@ -187,10 +208,10 @@ const DraggablePanel = ({
                 width: size.width,
                 height: size.height,
             }}
-            onMouseDown={handleMouseDown}
+            onPointerDown={handlePointerDown}
         >
             {/* Header */}
-            <div className={`flex items-center justify-between p-3 border-b cursor-move drag-handle select-none rounded-t-xl ${headerBg} ${headerClass}`}>
+            <div className={`flex items-center justify-between p-3 border-b cursor-move drag-handle select-none touch-none rounded-t-xl ${headerBg} ${headerClass}`} style={{ touchAction: 'none' }}>
                 <div className="flex items-center gap-2 font-semibold text-sm">
                     <GripHorizontal size={16} className="opacity-50" />
                     {icon && icon}
@@ -210,8 +231,9 @@ const DraggablePanel = ({
 
             {/* Resize Handle */}
             <div 
-                className="absolute bottom-0 right-0 w-5 h-5 cursor-nwse-resize flex items-center justify-center opacity-50 hover:opacity-100"
-                onMouseDown={handleResizeMouseDown}
+                className="absolute bottom-0 right-0 w-5 h-5 cursor-nwse-resize touch-none flex items-center justify-center opacity-50 hover:opacity-100"
+                onPointerDown={handleResizePointerDown}
+                style={{ touchAction: 'none' }}
             >
                 <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor">
                     <path d="M10 10L0 10L10 0Z" />

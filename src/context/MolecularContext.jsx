@@ -73,7 +73,7 @@ export const MolecularProvider = ({ children }) => {
                     const name = file.name || '';
                     const text = ev.target.result;
                     if (typeof text !== 'string' || text.trim().length === 0) {
-                        reject(new Error(`Empty or unreadable file. Supported formats: .xyz (atom count + coordinates), .pdb (ATOM records), .cif (Crystallographic Information File), POSCAR-like text`));
+                        reject(new Error(`Empty or unreadable file. Supported formats: .xyz (atom count + coordinates), .pdb (ATOM records), .cif (Crystallographic Information File), .mol (MDL MOL files), POSCAR-like text`));
                         return;
                     }
                     const lowerName = name.toLowerCase();
@@ -81,13 +81,14 @@ export const MolecularProvider = ({ children }) => {
                     if (lowerName.endsWith('.xyz')) format = 'xyz';
                     else if (lowerName.endsWith('.pdb')) format = 'pdb';
                     else if (lowerName.endsWith('.cif')) format = 'cif';
+                    else if (lowerName.endsWith('.mol')) format = 'mol';
                     else format = 'poscar'; // default
 
                     if (format === 'poscar') {
                         // Inline POSCAR parsing
                         const lines = text.trim().split('\n').map(l=>l.trim()).filter(l=>l!=='');
                         if (lines.length < 6) {
-                            reject(new Error(`Unrecognized file format. Supported formats: .xyz, .pdb, .cif, POSCAR-like text`));
+                            reject(new Error(`Unrecognized file format. Supported formats: .xyz, .pdb, .cif, .mol, POSCAR-like text`));
                             return;
                         }
                         const scale = parseFloat(lines[1]);
