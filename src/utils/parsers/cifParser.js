@@ -252,6 +252,10 @@ export async function parse(text) {
         return { element: atom.element, x, y, z };
     });
 
+    if (cartesianAtoms.length === 0) {
+        throw new Error('CIF parsing failed');
+    }
+
     return { atoms: cartesianAtoms, lattice };
 }
 

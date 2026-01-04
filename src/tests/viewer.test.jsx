@@ -68,8 +68,8 @@ const SetAtomsThenSwitch = () => {
     const { setAtoms, changeRenderer } = useMolecularContext();
     useEffect(() => {
         setAtoms(atoms);
-        // switch renderer to 'custom' after atoms set
-        changeRenderer('custom');
+        // switch renderer to 'custom-plastic' after atoms set
+        changeRenderer('custom-plastic');
     }, []);
     return null;
 };
