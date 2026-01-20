@@ -37,8 +37,15 @@ export const MolecularProvider = ({ children }) => {
         handleSetLattice: handleSetLatticeOp,
         addAtoms,
         updateAtoms
-        , renameLayer
+        , renameLayer,
+        recordOperation,
+        getOperationLog,
+        clearOperationLog,
+        exportOperationLog
     } = molecularState;
+
+    // Helper to also ship logs to middleware (recordOperation already ships from hook)
+    const recordOp = useCallback((type, params, metadata) => recordOperation(type, params, metadata), [recordOperation]);
 
     // UI State
     const [selectedAtomIds, setSelectedAtomIds] = useState([]);
@@ -162,6 +169,13 @@ export const MolecularProvider = ({ children }) => {
         if (isPdb) setPdbContent(text);
         
         const newIds = addAtoms(newAtoms, newLat, createNewLayer);
+        recordOp('IMPORT_FILE', {
+            fileName: file.name,
+            createNewLayer,
+            atomCount: newAtoms.length,
+            hasLattice: Boolean(newLat),
+            layerId: newIds.layerId
+        });
         setSelectedAtomIds(newIds);
     };
 
@@ -171,6 +185,13 @@ export const MolecularProvider = ({ children }) => {
             const { atoms: newAtoms, lattice: newLat } = await parse(content, undefined, fileName);
             console.log('Parsed atoms:', newAtoms.length, 'lattice:', newLat);
             const newIds = addAtoms(newAtoms, newLat, true); // Always create new layer
+            recordOp('IMPORT_TEXT', {
+                fileName,
+                createNewLayer: true,
+                atomCount: newAtoms.length,
+                hasLattice: Boolean(newLat),
+                layerId: newIds.layerId
+            });
             setSelectedAtomIds(newIds);
             setFileError(null);
             console.log('Structure loaded into new layer');
@@ -223,6 +244,11 @@ export const MolecularProvider = ({ children }) => {
         a.href = URL.createObjectURL(new Blob([s], {type:'text/plain'}));
         a.download = 'out.POSCAR';
         a.click();
+
+        recordOp('EXPORT_POSCAR', {
+            visibleAtoms: visibleAtoms.length,
+            visibleLayers: Array.from(visibleLayerIds)
+        }, { lattice });
     };
 
     const handleSupercell = (mode, diag, matrix) => {
@@ -265,7 +291,8 @@ export const MolecularProvider = ({ children }) => {
         setSelectedAtomIds,
         setEditMode,
         setTransformMode,
-        activeLayerId
+        activeLayerId,
+        recordOperation
     });
 
     const handleDragOver = (e) => {
@@ -352,6 +379,13 @@ export const MolecularProvider = ({ children }) => {
                 originalLattice: lattice,
                 originalLatticeSource: activeLayerId
             });
+
+            recordOp('AGENT_RESULT_RECEIVED', {
+                fileName,
+                atomCount: newAtoms.length,
+                resultLayerId: newLayerId,
+                originalLayers: selectedLayerIds
+            }, { lattice: newLat });
             
             setSelectedAtomIds(newIds);
             setFileError(null);
@@ -372,6 +406,8 @@ export const MolecularProvider = ({ children }) => {
              return l;
         }));
         setAgentReviewState({ status: 'idle', originalLayers: [], resultLayerId: null, originalLattice: null, originalLatticeSource: null });
+
+        recordOp('AGENT_RESULT_ACCEPT', { resultLayerId });
     };
 
     const denyAgentResult = () => {
@@ -396,6 +432,8 @@ export const MolecularProvider = ({ children }) => {
         // Revert lattice
         setLattice(originalLattice, agentReviewState.originalLatticeSource);
         setAgentReviewState({ status: 'idle', originalLayers: [], resultLayerId: null, originalLattice: null, originalLatticeSource: null });
+
+        recordOp('AGENT_RESULT_DENY', { resultLayerId, restoredLayers: originalLayers });
     };
 
     const handleLayerReviewAction = (layerId, action) => {
@@ -438,6 +476,8 @@ export const MolecularProvider = ({ children }) => {
                 setAgentReviewState({ status: 'idle', originalLayers: [], resultLayerId: null, originalLattice: null, originalLatticeSource: null });
             }
 
+            recordOp('AGENT_LAYER_ACTION', { layerId, action });
+
             return nextLayers;
         });
     };
@@ -451,7 +491,8 @@ export const MolecularProvider = ({ children }) => {
     // Delete selected atoms helper
     const deleteSelectedAtoms = () => {
         if (!selectedAtomIds || selectedAtomIds.length === 0) return;
-        updateAtoms(prev => prev.filter(a => !selectedAtomIds.includes(a.id)));
+        recordOp('DELETE_ATOMS', { ids: selectedAtomIds.slice(), count: selectedAtomIds.length });
+        updateAtoms(prev => prev.filter(a => !selectedAtomIds.includes(a.id)), 'delete-selected');
         setSelectedAtomIds([]);
     };
 
@@ -495,7 +536,11 @@ export const MolecularProvider = ({ children }) => {
         denyAgentResult,
         handleLayerReviewAction,
         // Renderer API
-        currentRenderer, setCurrentRenderer, renderers, showRendererDropdown, setShowRendererDropdown, changeRenderer
+        currentRenderer, setCurrentRenderer, renderers, showRendererDropdown, setShowRendererDropdown, changeRenderer,
+        // Operation log API
+        getOperationLog,
+        clearOperationLog,
+        exportOperationLog
     };
 
     return (

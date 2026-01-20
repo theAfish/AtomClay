@@ -1,5 +1,5 @@
 // Handlers related to atom selection and creation, extracted from MolecularContext
-export function createAtomHandlers({ lattice, updateAtoms, targetElement, setSelectedAtomIds, setEditMode, setTransformMode, activeLayerId }) {
+export function createAtomHandlers({ lattice, updateAtoms, targetElement, setSelectedAtomIds, setEditMode, setTransformMode, activeLayerId, recordOperation }) {
     const onAtomClick = (id, isMulti) => {
         // Selection only; deletion is handled by explicit delete action
         if (id === null) {
@@ -22,6 +22,7 @@ export function createAtomHandlers({ lattice, updateAtoms, targetElement, setSel
     };
 
     const onAtomsMoveEnd = (moves) => {
+        recordOperation?.('UPDATE_ATOMS', { reason: 'drag-move', moved: moves.length });
         updateAtoms(prev => {
             const moveMap = new Map(moves.map(m => [m.id, m]));
             return prev.map(a => {
@@ -31,7 +32,7 @@ export function createAtomHandlers({ lattice, updateAtoms, targetElement, setSel
                 }
                 return a;
             });
-        });
+        }, 'drag-move');
     };
 
     const createAtomAtCenter = (elementOverride) => {
@@ -47,7 +48,14 @@ export function createAtomHandlers({ lattice, updateAtoms, targetElement, setSel
                 newId = maxId + 1;
                 const newAtom = { id: newId, element: elementOverride || targetElement, x: cx, y: cy, z: cz, layerId: activeLayerId };
                 return [...prev, newAtom];
-            });
+            }, 'create-atom-center');
+
+            recordOperation?.('ADD_ATOMS', {
+                count: 1,
+                createNewLayer: false,
+                targetLayerId: activeLayerId,
+                hasLattice: Boolean(lattice)
+            }, { lattice });
 
             if (newId !== null) {
                 setSelectedAtomIds([newId]);

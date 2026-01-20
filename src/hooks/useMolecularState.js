@@ -1,8 +1,8 @@
-import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
-import { MathUtils } from '../utils/math';
-import { parse } from '../utils/parsers';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { DEFAULTS } from '../constants/defaults';
 import { handleSupercell as doSupercell, handleVacuum as doVacuum, handleScaleLattice as doScaleLattice, handleSetLattice as doSetLattice } from '../components/operations/latticeHandlers';
+import { createOperationRecorder } from '../utils/operationRecorder';
+import { logOperation as sendOperationEntry } from '../services/loggerService';
 
 export function useMolecularState() {
     // Layers State
@@ -20,6 +20,25 @@ export function useMolecularState() {
     const redoStackRef = useRef([]);
     const isUndoingRef = useRef(false);
     const MAX_HISTORY = DEFAULTS.HISTORY.MAX_LENGTH;
+
+    // Operation log for replay/export (separate from undo/redo snapshots)
+    const operationRecorderRef = useRef(createOperationRecorder(DEFAULTS.HISTORY?.OPERATION_MAX_LENGTH || 1000));
+
+    const recordOperation = useCallback((type, params = {}, metadata = {}) => {
+        if (isUndoingRef.current) return null;
+        const entry = operationRecorderRef.current.record(type, params, {
+            ...metadata,
+            activeLayerId,
+            latticeSourceId: currentLatticeSourceId
+        });
+        // Best-effort async send to middleware
+        try { if (entry) sendOperationEntry(entry); } catch {}
+        return entry;
+    }, [activeLayerId, currentLatticeSourceId]);
+
+    const getOperationLog = useCallback(() => operationRecorderRef.current.getLog(), []);
+    const clearOperationLog = useCallback(() => operationRecorderRef.current.clear(), []);
+    const exportOperationLog = useCallback((indent = 2) => operationRecorderRef.current.exportAsJson(indent), []);
 
     const saveStateToHistory = useCallback((prevAtoms, prevLattice, prevLayers, prevActiveId, prevSourceId) => {
         if (isUndoingRef.current) return;
@@ -116,25 +135,33 @@ export function useMolecularState() {
         }
         setCurrentLattice(newLattice);
         if (sourceId) setCurrentLatticeSourceId(sourceId);
-    }, [atoms, lattice, layers, activeLayerId, currentLatticeSourceId, saveStateToHistory]);
+
+        if (!skipHistory) {
+            recordOperation('SET_LATTICE', { sourceId: sourceId || currentLatticeSourceId }, { lattice: newLattice });
+        }
+    }, [atoms, lattice, layers, activeLayerId, currentLatticeSourceId, saveStateToHistory, recordOperation]);
 
     // Operations
 
     const handleSupercell = useCallback((mode, diag, matrix) => {
+        recordOperation('SUPERCELL', { mode, diag, matrix }, { lattice });
         doSupercell(atoms, lattice, layers, activeLayerId, saveStateToHistory, currentLatticeSourceId, setLayers, setCurrentLattice, setAtoms, mode, diag, matrix);
-    }, [atoms, lattice, layers, activeLayerId, saveStateToHistory, currentLatticeSourceId, setLayers, setCurrentLattice, setAtoms]);
+    }, [atoms, lattice, layers, activeLayerId, saveStateToHistory, currentLatticeSourceId, setLayers, setCurrentLattice, setAtoms, recordOperation]);
 
     const handleVacuum = useCallback((size, axis = 2) => {
+        recordOperation('VACUUM', { size, axis }, { lattice });
         doVacuum(atoms, lattice, layers, activeLayerId, saveStateToHistory, currentLatticeSourceId, setLayers, setCurrentLattice, size, axis);
-    }, [atoms, lattice, layers, activeLayerId, saveStateToHistory, currentLatticeSourceId, setLayers, setCurrentLattice]);
+    }, [atoms, lattice, layers, activeLayerId, saveStateToHistory, currentLatticeSourceId, setLayers, setCurrentLattice, recordOperation]);
 
     const handleScaleLattice = useCallback((scaleX = 1, scaleY = 1, scaleZ = 1) => {
+        recordOperation('SCALE_LATTICE', { scaleX, scaleY, scaleZ }, { lattice });
         doScaleLattice(atoms, lattice, layers, activeLayerId, saveStateToHistory, currentLatticeSourceId, setLayers, setCurrentLattice, scaleX, scaleY, scaleZ);
-    }, [atoms, lattice, layers, activeLayerId, saveStateToHistory, currentLatticeSourceId, setLayers, setCurrentLattice]);
+    }, [atoms, lattice, layers, activeLayerId, saveStateToHistory, currentLatticeSourceId, setLayers, setCurrentLattice, recordOperation]);
 
     const handleSetLattice = useCallback((newLattice) => {
+        recordOperation('SET_LATTICE_MANUAL', { fromOperation: true }, { lattice: newLattice });
         doSetLattice(atoms, lattice, layers, activeLayerId, saveStateToHistory, currentLatticeSourceId, setLayers, setCurrentLattice, newLattice);
-    }, [atoms, lattice, layers, activeLayerId, saveStateToHistory, currentLatticeSourceId, setLayers, setCurrentLattice]);
+    }, [atoms, lattice, layers, activeLayerId, saveStateToHistory, currentLatticeSourceId, setLayers, setCurrentLattice, recordOperation]);
 
     const addAtoms = useCallback((newAtoms, newLat, createNewLayer = false) => {
         let targetLayerId = activeLayerId;
@@ -156,6 +183,13 @@ export function useMolecularState() {
 
         const maxId = atoms && atoms.length ? Math.max(...atoms.map(a => a.id)) : -1;
         const mapped = (newAtoms || []).map((a, i) => ({ ...a, id: maxId + 1 + i, layerId: targetLayerId }));
+
+        recordOperation('ADD_ATOMS', {
+            count: mapped.length,
+            createNewLayer,
+            targetLayerId,
+            hasLattice: Boolean(newLat)
+        }, { lattice: newLat || lattice });
         
         setAtoms(prev => {
             saveStateToHistory(prev, lattice, layers, activeLayerId, currentLatticeSourceId);
@@ -180,21 +214,23 @@ export function useMolecularState() {
         const resultIds = mapped.map(m => m.id);
         resultIds.layerId = targetLayerId;
         return resultIds; // Return new IDs for selection
-    }, [atoms, lattice, layers, activeLayerId, saveStateToHistory, currentLatticeSourceId]);
+    }, [atoms, lattice, layers, activeLayerId, saveStateToHistory, currentLatticeSourceId, recordOperation]);
 
-    const updateAtoms = useCallback((updater) => {
+    const updateAtoms = useCallback((updater, reason = 'custom') => {
+        recordOperation('UPDATE_ATOMS', { reason });
         setAtoms(prev => {
             saveStateToHistory(prev, lattice, layers, activeLayerId, currentLatticeSourceId);
             return updater(prev);
         });
-    }, [lattice, layers, activeLayerId, saveStateToHistory, currentLatticeSourceId]);
+    }, [lattice, layers, activeLayerId, saveStateToHistory, currentLatticeSourceId, recordOperation]);
 
     const renameLayer = useCallback((layerId, newName) => {
+        recordOperation('RENAME_LAYER', { layerId, newName });
         setLayers(prev => {
             saveStateToHistory(atoms, lattice, prev, activeLayerId, currentLatticeSourceId);
             return prev.map(l => l.id === layerId ? { ...l, name: newName } : l);
         });
-    }, [atoms, lattice, activeLayerId, saveStateToHistory, currentLatticeSourceId]);
+    }, [atoms, lattice, activeLayerId, saveStateToHistory, currentLatticeSourceId, recordOperation]);
 
     return {
         atoms,
@@ -215,6 +251,10 @@ export function useMolecularState() {
         updateAtoms,
         renameLayer,
         saveStateToHistory,
-        currentLatticeSourceId
+        currentLatticeSourceId,
+        recordOperation,
+        getOperationLog,
+        clearOperationLog,
+        exportOperationLog
     };
 }

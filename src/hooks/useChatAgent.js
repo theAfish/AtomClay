@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useMolecularContext } from '../context/MolecularContext';
 import { buildStructurePayload } from '../utils/structureExports';
 import { CHAT_CONSTANTS } from '../constants/chatConstants';
 import { runAgent, getFinalStructure } from '../services/api';
+import { setSessionInfo as setLoggerSessionInfo } from '../services/loggerService';
 
 export const useChatAgent = () => {
     const { atoms, lattice, layers, activeLayerId, loadStructureFromText, handleAgentResult } = useMolecularContext();
@@ -20,6 +21,10 @@ export const useChatAgent = () => {
     const [statusMessage, setStatusMessage] = useState('');
     const [userId] = useState(`u_${Math.random().toString(36).substring(2, 8)}`);
     const [sessionId] = useState(`s_${Math.random().toString(36).substring(2, 8)}`);
+
+    useEffect(() => {
+        setLoggerSessionInfo({ userId, sessionId });
+    }, [userId, sessionId]);
 
     const sendMessage = async (text) => {
         const trimmed = text.trim();
