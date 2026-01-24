@@ -37,6 +37,21 @@ export default defineConfig(({ command }) => {
           target: 'http://localhost:3000',
           changeOrigin: true,
           secure: false,
+        },
+        '/import': {
+          target: 'http://localhost:3000',
+          changeOrigin: true,
+          secure: false,
+        },
+        '/export': {
+          target: 'http://localhost:3000',
+          changeOrigin: true,
+          secure: false,
+        },
+        '/list': {
+          target: 'http://localhost:3000',
+          changeOrigin: true,
+          secure: false,
         }
       }
     }

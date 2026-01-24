@@ -4,6 +4,7 @@ import { buildStructurePayload } from '../utils/structureExports';
 import { CHAT_CONSTANTS } from '../constants/chatConstants';
 import { runAgent, getFinalStructure } from '../services/api';
 import { setSessionInfo as setLoggerSessionInfo } from '../services/loggerService';
+import { setSessionInfo as setFileStorageSessionInfo } from '../services/fileStorageService';
 
 export const useChatAgent = () => {
     const { atoms, lattice, layers, activeLayerId, loadStructureFromText, handleAgentResult } = useMolecularContext();
@@ -24,6 +25,7 @@ export const useChatAgent = () => {
 
     useEffect(() => {
         setLoggerSessionInfo({ userId, sessionId });
+        setFileStorageSessionInfo({ userId, sessionId });
     }, [userId, sessionId]);
 
     const sendMessage = async (text) => {

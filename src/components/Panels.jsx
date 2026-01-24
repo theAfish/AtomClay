@@ -109,14 +109,20 @@ const Panels = () => {
     const { bgCard, bgMetric, buttonDanger, buttonDangerBg, layerActive, layerInactive, layerButton, layerTextDanger, borderInput } = panels;
 
     const onApplyEdit = () => {
-        if(selectedAtomIds.length > 0) {
-            updateAtoms(prev => prev.map(a => selectedAtomIds.includes(a.id) ? { ...a, element: targetElement } : a));
+        if (selectedAtomIds.length > 0) {
+            const ids = selectedAtomIds.slice();
+            updateAtoms(
+                prev => prev.map(a => ids.includes(a.id) ? { ...a, element: targetElement } : a),
+                'replace-element',
+                { ids, count: ids.length, newElement: targetElement }
+            );
         }
     };
 
     const onDelete = () => {
-        if(selectedAtomIds.length > 0) {
-            updateAtoms(prev => prev.filter(a => !selectedAtomIds.includes(a.id)));
+        if (selectedAtomIds.length > 0) {
+            const ids = selectedAtomIds.slice();
+            updateAtoms(prev => prev.filter(a => !ids.includes(a.id)), 'delete-selected', { ids, count: ids.length });
             setSelectedAtomIds([]);
         }
     };

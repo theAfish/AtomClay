@@ -4,6 +4,7 @@ import { useMolecularState } from '../hooks/useMolecularState';
 import { MathUtils } from '../utils/math';
 import { parse } from '../utils/parsers';
 import { createAtomHandlers } from './atomHandlers';
+import { fileStorageService } from '../services/fileStorageService';
 
 const MolecularContext = createContext(null);
 
@@ -177,6 +178,24 @@ export const MolecularProvider = ({ children }) => {
             layerId: newIds.layerId
         });
         setSelectedAtomIds(newIds);
+        
+        // Save file to backend storage
+        try {
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const content = e.target.result;
+                    const result = await fileStorageService.importFile(content, file.name);
+                    console.log('File saved to backend:', result);
+                } catch (error) {
+                    console.warn('Failed to save file to backend:', error);
+                    // Non-fatal - don't block the import
+                }
+            };
+            reader.readAsText(file);
+        } catch (error) {
+            console.warn('Failed to initiate backend file save:', error);
+        }
     };
 
     const loadStructureFromText = async (content, fileName) => {
@@ -218,37 +237,58 @@ export const MolecularProvider = ({ children }) => {
     };
 
     const handleDownload = () => {
-        // Generate POSCAR (requires lattice)
-        if (!lattice) return alert('No lattice info available for POSCAR export');
-        let s = "AtomClay\n1.0\n";
-        lattice.forEach(v => s+=` ${v[0].toFixed(6)} ${v[1].toFixed(6)} ${v[2].toFixed(6)}\n`);
-        const groups={};
+        // Generate ExtXYZ (requires lattice)
+        if (!lattice) return alert('No lattice info available for ExtXYZ export');
         
         // Filter atoms from visible layers only
         const visibleLayerIds = new Set(layers.filter(l => l.visible).map(l => l.id));
         const visibleAtoms = atoms.filter(a => visibleLayerIds.has(a.layerId));
         
-        visibleAtoms.forEach(a=>{ if(!groups[a.element])groups[a.element]=[]; groups[a.element].push(a); });
-        const els=Object.keys(groups);
-        s+=` ${els.join(' ')}\n ${els.map(e=>groups[e].length).join(' ')}\nDirect\n`;
-        const invL = MathUtils.inv3x3(lattice);
-        const invLT = MathUtils.transpose3x3(invL);
-        els.forEach(e=>{
-            groups[e].forEach(a=>{
-                const [fx,fy,fz] = MathUtils.multiplyMatrixVector(invLT, [a.x,a.y,a.z]);
-                const w = v => (v-Math.floor(v+0.0001)).toFixed(6);
-                s+=` ${w(fx)} ${w(fy)} ${w(fz)}\n`;
-            });
+        if (visibleAtoms.length === 0) {
+            return alert('No visible atoms to export');
+        }
+        
+        // Build ExtXYZ format
+        let s = `${visibleAtoms.length}\n`;
+        
+        // Comment line with lattice info
+        const latticeStr = `Lattice="${lattice[0][0]} ${lattice[0][1]} ${lattice[0][2]} ${lattice[1][0]} ${lattice[1][1]} ${lattice[1][2]} ${lattice[2][0]} ${lattice[2][1]} ${lattice[2][2]}" Properties=species:S:1:pos:R:3`;
+        s += `${latticeStr}\n`;
+        
+        // Atom lines (element x y z)
+        visibleAtoms.forEach(a => {
+            s += `${a.element} ${a.x.toFixed(6)} ${a.y.toFixed(6)} ${a.z.toFixed(6)}\n`;
         });
+        
+        // Generate timestamped filename
+        const now = new Date();
+        const timestamp = now.toISOString().replace(/[:.]/g, '-').slice(0, -5);
+        const filename = `structure_${timestamp}.extxyz`;
+        
+        // Download to user
         const a = document.createElement('a');
         a.href = URL.createObjectURL(new Blob([s], {type:'text/plain'}));
-        a.download = 'out.POSCAR';
+        a.download = filename;
         a.click();
 
-        recordOp('EXPORT_POSCAR', {
+        recordOp('EXPORT_EXTXYZ', {
             visibleAtoms: visibleAtoms.length,
-            visibleLayers: Array.from(visibleLayerIds)
+            visibleLayers: Array.from(visibleLayerIds),
+            filename: filename
         }, { lattice });
+        
+        // Save export to backend storage (mark as export for timestamp)
+        try {
+            fileStorageService.importFile(s, filename, 'extxyz', true)
+                .then(result => {
+                    console.log('Export saved to backend:', result);
+                })
+                .catch(error => {
+                    console.warn('Failed to save export to backend:', error);
+                });
+        } catch (error) {
+            console.warn('Failed to initiate backend export save:', error);
+        }
     };
 
     const handleSupercell = (mode, diag, matrix) => {

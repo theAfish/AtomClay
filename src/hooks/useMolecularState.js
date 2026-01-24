@@ -216,8 +216,8 @@ export function useMolecularState() {
         return resultIds; // Return new IDs for selection
     }, [atoms, lattice, layers, activeLayerId, saveStateToHistory, currentLatticeSourceId, recordOperation]);
 
-    const updateAtoms = useCallback((updater, reason = 'custom') => {
-        recordOperation('UPDATE_ATOMS', { reason });
+    const updateAtoms = useCallback((updater, reason = 'custom', operationParams = {}) => {
+        recordOperation('UPDATE_ATOMS', { reason, ...operationParams });
         setAtoms(prev => {
             saveStateToHistory(prev, lattice, layers, activeLayerId, currentLatticeSourceId);
             return updater(prev);
