@@ -52,6 +52,36 @@ export default defineConfig(({ command }) => {
           target: 'http://localhost:3000',
           changeOrigin: true,
           secure: false,
+        },
+        '/get_config': {
+          target: 'http://localhost:3000',
+          changeOrigin: true,
+          secure: false,
+        },
+        '/config': {
+          target: 'http://localhost:3000',
+          changeOrigin: true,
+          secure: false,
+        },
+        '/env': {
+          target: 'http://localhost:3000',
+          changeOrigin: true,
+          secure: false,
+        },
+        '/set_config': {
+          target: 'http://localhost:3000',
+          changeOrigin: true,
+          secure: false,
+        },
+        '/set_env': {
+          target: 'http://localhost:3000',
+          changeOrigin: true,
+          secure: false,
+        },
+        '/validate': {
+          target: 'http://localhost:3000',
+          changeOrigin: true,
+          secure: false,
         }
       }
     }
