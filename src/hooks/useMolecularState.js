@@ -61,6 +61,8 @@ export function useMolecularState() {
         const h = historyRef.current;
         if (!h || h.length === 0) return;
 
+        recordOperation('UNDO', {}, { lattice });
+
         // Save current state to Redo
         const currentSnap = {
             atoms: atoms ? atoms.map(a => ({ ...a })) : [],
@@ -81,7 +83,7 @@ export function useMolecularState() {
         
         // allow state push suppression to end on next tick
         setTimeout(() => { isUndoingRef.current = false; }, 0);
-    }, [atoms, layers, lattice, activeLayerId, currentLatticeSourceId]);
+    }, [atoms, layers, lattice, activeLayerId, currentLatticeSourceId, recordOperation]);
 
     const redo = useCallback(() => {
         const r = redoStackRef.current;

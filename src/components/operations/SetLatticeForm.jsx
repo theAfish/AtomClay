@@ -27,7 +27,7 @@ const SetLatticeForm = ({ handleSetLattice, lattice, t, panels }) => {
                 const newLat = setMat.map(r => r.map(v => +v));
                 handleSetLattice(newLat);
             }} className={`w-full ${buttonSecondary} p-1 rounded text-xs font-bold`}>{t('Apply')}</button>
-            <div className={`text-[10px] mt-1 ${textMuted}`}>Sets the full 3x3 lattice matrix (a, b, c as row vectors). Atom Cartesian coordinates remain unchanged.</div>
+            <div className={`text-[10px] mt-1 ${textMuted}`}>{t('Sets the full 3x3 lattice matrix (a, b, c as row vectors). Atom Cartesian coordinates remain unchanged.')}</div>
         </div>
     );
 };

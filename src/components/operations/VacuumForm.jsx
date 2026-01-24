@@ -13,7 +13,7 @@ const VacuumForm = ({ handleVacuum, t, panels }) => {
                     <input type="number" value={vacuum} onChange={e => setVacuum(+e.target.value)} className={`w-full ${bgInputDarker} border ${borderClass} rounded px-2 py-1 text-sm ${textPrimary}`} />
                 </div>
                 <div className="w-20">
-                    <label className={`text-xs ${textMuted} block mb-1`}>Axis</label>
+                    <label className={`text-xs ${textMuted} block mb-1`}>{t('Axis')}</label>
                     <select value={vacuumAxis} onChange={e => setVacuumAxis(+e.target.value)} className={`w-full ${bgInputDarker} border ${borderClass} rounded px-2 py-1 text-sm ${textPrimary}`}>
                         <option value={0}>a</option>
                         <option value={1}>b</option>

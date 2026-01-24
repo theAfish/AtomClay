@@ -13,7 +13,7 @@ const ScaleForm = ({ handleScaleLattice, t, panels }) => {
                 ))}
             </div>
             <button onClick={() => { handleScaleLattice(scaleVec[0] || 1, scaleVec[1] || 1, scaleVec[2] || 1); setScaleVec([1, 1, 1]); }} className={`w-full ${buttonSecondary} p-1 rounded text-xs font-bold`}>{t('Apply')}</button>
-            <div className={`text-[10px] mt-1 ${textMuted}`}>Scale factors applied to the lattice vectors a, b and c respectively. Atom coordinates remain unchanged.</div>
+            <div className={`text-[10px] mt-1 ${textMuted}`}>{t('Scale factors applied to the lattice vectors a, b and c respectively. Atom coordinates remain unchanged.')}</div>
         </div>
     );
 };

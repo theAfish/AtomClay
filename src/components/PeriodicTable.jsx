@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ELEMENT_DATA } from '../constants/elements';
 
 const PERIODIC_TABLE_LAYOUT = [
@@ -15,6 +16,7 @@ const LANTHANIDES = ['Ce', 'Pr', 'Nd', 'Pm', 'Sm', 'Eu', 'Gd', 'Tb', 'Dy', 'Ho',
 const ACTINIDES =   ['Th', 'Pa', 'U',  'Np', 'Pu', 'Am', 'Cm', 'Bk', 'Cf', 'Es', 'Fm', 'Md', 'No', 'Lr'];
 
 const PeriodicTable = ({ onSelect, currentElement, panels }) => {
+    const { t } = useTranslation();
     const { bgCard, borderClass } = panels;
     const [hoveredElement, setHoveredElement] = useState(null);
 
@@ -97,21 +99,21 @@ const PeriodicTable = ({ onSelect, currentElement, panels }) => {
                         >
                             {displayElement || '?'}
                         </div>
-                        <h3 className="text-xl font-bold text-white">{displayElement || 'Select'}</h3>
+                        <h3 className="text-xl font-bold text-white">{displayElement || t('Select')}</h3>
                     </div>
 
                     {displayData && (
                         <div className="space-y-2 text-sm text-gray-300">
                             <div className="flex justify-between border-b border-white/10 pb-1">
-                                <span>Radius:</span>
+                                <span>{t('Radius')}:</span>
                                 <span className="font-mono text-white">{displayData.radius} Å</span>
                             </div>
                             <div className="flex justify-between border-b border-white/10 pb-1">
-                                <span>VDW:</span>
+                                <span>{t('VDW')}:</span>
                                 <span className="font-mono text-white">{displayData.vdw} Å</span>
                             </div>
                             <div className="flex justify-between border-b border-white/10 pb-1">
-                                <span>Color:</span>
+                                <span>{t('Color')}:</span>
                                 <span className="font-mono text-white">#{displayData.color.toString(16).padStart(6, '0').toUpperCase()}</span>
                             </div>
                         </div>
@@ -119,7 +121,7 @@ const PeriodicTable = ({ onSelect, currentElement, panels }) => {
                     
                     {!displayData && (
                         <div className="text-center text-gray-500 text-sm mt-4">
-                            Hover over an element to see details
+                            {t('Hover over an element to see details')}
                         </div>
                     )}
                 </div>
