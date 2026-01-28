@@ -111,6 +111,20 @@ export const ELEMENT_DATA = {
     "Default": { color: 0xFF00FF, radius: 1.0, vdw: 2.0 },
 };
 
-export const getElementProp = (el) => ELEMENT_DATA[el] || ELEMENT_DATA["Default"];
+const normalizeElement = (el) => {
+    if (!el) return "Default";
+    if (ELEMENT_DATA[el]) return el;
+    
+    // Try to strip digits, signs, and clean up
+    const clean = el.replace(/[^A-Za-z]/g, '');
+    if (clean.length > 0) {
+        const normalized = clean.charAt(0).toUpperCase() + clean.slice(1).toLowerCase();
+        if (ELEMENT_DATA[normalized]) return normalized;
+    }
+    
+    return "Default";
+};
 
-export const getVdw = (el) => (ELEMENT_DATA[el] ? ELEMENT_DATA[el].vdw : ELEMENT_DATA["Default"].vdw);
+export const getElementProp = (el) => ELEMENT_DATA[normalizeElement(el)];
+
+export const getVdw = (el) => ELEMENT_DATA[normalizeElement(el)].vdw;
