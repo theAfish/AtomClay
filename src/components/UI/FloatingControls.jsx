@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { Moon, Sun, ChevronDown, Settings } from 'lucide-react';
+import { Moon, Sun, ChevronDown, Settings, SlidersHorizontal } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useMolecularContext } from '../../context/MolecularContext';
 import { useTheme } from '../../context/ThemeContext';
 import SettingsPanel from './SettingsPanel';
 import ConfigValidationAlert from './ConfigValidationAlert';
+import RenderSettingsPanel from './RenderSettingsPanel';
 
 const FloatingControls = () => {
     const { i18n } = useTranslation();
@@ -18,6 +19,7 @@ const FloatingControls = () => {
 
     const { theme, setTheme } = useTheme();
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const [isRenderSettingsOpen, setIsRenderSettingsOpen] = useState(false);
 
     const languages = [
         { code: 'zh', label: '中文' },
@@ -52,6 +54,14 @@ const FloatingControls = () => {
                 >
                     <Settings size={16} />
                     Settings
+                </button>
+                <button
+                    className={`px-3 py-1 rounded-full shadow-lg text-sm font-medium flex items-center gap-2 ${theme === 'dark' ? 'bg-slate-800 text-white hover:bg-slate-700' : 'bg-white text-slate-800 hover:bg-slate-100'}`}
+                    onClick={() => setIsRenderSettingsOpen(true)}
+                    title="Render Settings"
+                >
+                    <SlidersHorizontal size={16} />
+                    Render
                 </button>
                 <div className="relative renderer-dropdown">
                     <button 
@@ -111,6 +121,7 @@ const FloatingControls = () => {
             </div>
 
             <SettingsPanel isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
+            <RenderSettingsPanel isOpen={isRenderSettingsOpen} onClose={() => setIsRenderSettingsOpen(false)} />
         </>
     );
 };

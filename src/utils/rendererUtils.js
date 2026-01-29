@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { createThreeRenderer, createCustomRenderer } from '../renderers';
 
-export const initializeRenderer = (containerRef, currentRenderer, onAtomClick, onAtomsMoveEnd, onBoxSelect, theme, lattice, drawGizmoRef, latestProps, atoms, layers, activeLayerId, rendererRef, threeRef, transformMode = 'translate', editMode = 'SELECT') => {
+export const initializeRenderer = (containerRef, currentRenderer, onAtomClick, onAtomsMoveEnd, onBoxSelect, theme, lattice, renderSettings, drawGizmoRef, latestProps, atoms, layers, activeLayerId, rendererRef, threeRef, transformMode = 'translate', editMode = 'SELECT') => {
     if (!containerRef.current) return;
     // Capture previous camera/controls state so we can preserve viewport when
     // switching renderers. This avoids jumps when swapping implementations.
@@ -31,6 +31,7 @@ export const initializeRenderer = (containerRef, currentRenderer, onAtomClick, o
     // Map renderer id to atom style. Support both legacy and new ids.
     if (currentRenderer === 'custom-toon' || currentRenderer === 'custom-cartoon') atomStyle = 'toon';
     else if (currentRenderer === 'custom-plastic') atomStyle = 'plastic';
+    else if (currentRenderer === 'custom-glossy') atomStyle = 'glossy';
     else if (currentRenderer === 'custom') atomStyle = 'plastic'; // legacy fallback
 
     const rendererApi = currentRenderer && currentRenderer.startsWith('custom') ? createCustomRenderer() : createThreeRenderer();
@@ -67,7 +68,7 @@ export const initializeRenderer = (containerRef, currentRenderer, onAtomClick, o
     rendererApi._latestProps = latestProps.current;
 
     // Sync initial scene to renderer
-    try { if (rendererApi.syncScene) rendererApi.syncScene({ atoms, lattice, layers, activeLayerId, theme }); } catch(e) {}
+    try { if (rendererApi.syncScene) rendererApi.syncScene({ atoms, lattice, layers, activeLayerId, theme, renderSettings }); } catch(e) {}
 
     // Configure transform controls to match current UI state
     try {
@@ -81,8 +82,8 @@ export const initializeRenderer = (containerRef, currentRenderer, onAtomClick, o
     };
 };
 
-export const syncRendererScene = (rendererRef, atoms, lattice, layers, activeLayerId, theme) => {
+export const syncRendererScene = (rendererRef, atoms, lattice, layers, activeLayerId, theme, renderSettings) => {
     if (rendererRef.current && rendererRef.current.syncScene) {
-        try { rendererRef.current.syncScene({ atoms, lattice, layers, activeLayerId, theme }); } catch (e) {}
+        try { rendererRef.current.syncScene({ atoms, lattice, layers, activeLayerId, theme, renderSettings }); } catch (e) {}
     }
 };

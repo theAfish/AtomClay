@@ -139,12 +139,26 @@ export function createThreeRenderer() {
             return threeRef;
         },
 
-        syncScene({ atoms = [], lattice = null, layers = [], activeLayerId = null, theme = 'dark' } = {}) {
+        syncScene({ atoms = [], lattice = null, layers = [], activeLayerId = null, theme = 'dark', renderSettings = null } = {}) {
             if (!threeRef.scene) return;
-            api._latestProps = { atoms, activeLayerId, theme };
+            api._latestProps = { atoms, activeLayerId, theme, renderSettings };
             threeRef.lattice = lattice;
 
             const scene = threeRef.scene;
+            const settings = {
+                atomScale: Number.isFinite(renderSettings?.atomScale) ? renderSettings.atomScale : DEFAULTS.VISUALS.ATOM_SCALE,
+                vdwScale: Number.isFinite(renderSettings?.vdwScale) ? renderSettings.vdwScale : 1,
+                atomColorMode: renderSettings?.atomColorMode === 'single' ? 'single' : 'element',
+                atomColor: renderSettings?.atomColor || null
+            };
+            threeRef.renderSettings = settings;
+            const resolveAtomColor = (element) => {
+                if (settings.atomColorMode === 'single' && settings.atomColor) {
+                    try { return new THREE.Color(settings.atomColor); } catch (e) {}
+                }
+                const prop = getElementProp(element);
+                return new THREE.Color(prop.color);
+            };
             // Update scene background target based on theme
             threeRef.targetBackgroundColor.set(theme === 'dark' ? COLORS.background.dark : COLORS.background.light);
             threeRef.targetLatticeColor.set(theme === 'dark' ? COLORS.lattice.dark : COLORS.lattice.light);
@@ -199,10 +213,10 @@ export function createThreeRenderer() {
                 visibleAtoms.forEach((atom, i) => {
                     const prop = getElementProp(atom.element);
                     dummy.position.set(atom.x, atom.y, atom.z);
-                    dummy.scale.setScalar(prop.radius * DEFAULTS.VISUALS.ATOM_SCALE);
+                    dummy.scale.setScalar(prop.radius * settings.atomScale);
                     dummy.updateMatrix();
                     instMesh.setMatrixAt(i, dummy.matrix);
-                    try { instMesh.setColorAt(i, new THREE.Color(prop.color)); } catch(e){}
+                    try { instMesh.setColorAt(i, resolveAtomColor(atom.element)); } catch(e){}
                     threeRef.instanceIdToAtomId[i] = atom.id;
                     threeRef.atomIdToInstanceId.set && threeRef.atomIdToInstanceId.set(atom.id, i);
                 });
@@ -213,10 +227,10 @@ export function createThreeRenderer() {
                 const sphereGeo = new THREE.SphereGeometry(1, DEFAULTS.VISUALS.SPHERE_SEGMENTS, DEFAULTS.VISUALS.SPHERE_SEGMENTS);
                 visibleAtoms.forEach(atom => {
                     const prop = getElementProp(atom.element);
-                    const mat = new THREE.MeshStandardMaterial({ color: prop.color, roughness:0.1, metalness:0.1, emissive: COLORS.general.black });
+                    const mat = new THREE.MeshStandardMaterial({ color: resolveAtomColor(atom.element), roughness:0.1, metalness:0.1, emissive: COLORS.general.black });
                     const mesh = new THREE.Mesh(sphereGeo, mat);
                     mesh.position.set(atom.x, atom.y, atom.z);
-                    mesh.scale.setScalar(prop.radius * DEFAULTS.VISUALS.ATOM_SCALE);
+                    mesh.scale.setScalar(prop.radius * settings.atomScale);
                     mesh.userData = { type: 'atom', id: atom.id };
                     scene.add(mesh);
                     atomMeshes.set(atom.id, mesh);
@@ -243,10 +257,10 @@ export function createThreeRenderer() {
 
                 for (let i=0;i<visibleAtoms.length;i++){
                     const p1=[visibleAtoms[i].x,visibleAtoms[i].y,visibleAtoms[i].z];
-                    const r1 = getVdw(visibleAtoms[i].element);
+                    const r1 = getVdw(visibleAtoms[i].element) * settings.vdwScale;
                     for (let j=i;j<visibleAtoms.length;j++){
                         const p2Base=[visibleAtoms[j].x,visibleAtoms[j].y,visibleAtoms[j].z];
-                        const r2 = getVdw(visibleAtoms[j].element);
+                        const r2 = getVdw(visibleAtoms[j].element) * settings.vdwScale;
                         // enumerate nearby periodic images (nx,ny,nz in [-1,1]) so multiple periodic-image bonds may be captured
                         const maxOffset = 1;
                         for (let nx=-maxOffset; nx<=maxOffset; nx++){
@@ -281,9 +295,9 @@ export function createThreeRenderer() {
                                         // midpoint on j-side (toward the image of i)
                                         const midJ = new THREE.Vector3(p2Base[0] + 0.5*(p1Image[0] - p2Base[0]), p2Base[1] + 0.5*(p1Image[1] - p2Base[1]), p2Base[2] + 0.5*(p1Image[2] - p2Base[2]));
                                         // attach first half to displayed position of atom i
-                                        bondSegments.push({ start: new THREE.Vector3(...p1), end: midI.clone(), color: new THREE.Color(getElementProp(visibleAtoms[i].element).color) });
+                                        bondSegments.push({ start: new THREE.Vector3(...p1), end: midI.clone(), color: resolveAtomColor(visibleAtoms[i].element) });
                                         // attach second half to the displayed position of atom j (p2Base), pointing toward the boundary
-                                        bondSegments.push({ start: new THREE.Vector3(...p2Base), end: midJ.clone(), color: new THREE.Color(getElementProp(visibleAtoms[j].element).color) });
+                                        bondSegments.push({ start: new THREE.Vector3(...p2Base), end: midJ.clone(), color: resolveAtomColor(visibleAtoms[j].element) });
                                     }
                                 }
                             }
@@ -317,9 +331,16 @@ export function createThreeRenderer() {
                 atoms.forEach(atom => {
                     const idx = atomIdToInstanceId.get && atomIdToInstanceId.get(atom.id);
                     if (idx !== undefined) {
-                        const prop = getElementProp(atom.element);
+                        const settings = threeRef.renderSettings || {};
+                        const resolveAtomColor = (element) => {
+                            if (settings.atomColorMode === 'single' && settings.atomColor) {
+                                try { return new THREE.Color(settings.atomColor); } catch (e) {}
+                            }
+                            const prop = getElementProp(element);
+                            return new THREE.Color(prop.color);
+                        };
                         const isSelected = selectedAtomIds.includes(atom.id);
-                        const color = new THREE.Color(prop.color);
+                        const color = resolveAtomColor(atom.element);
                         if (isSelected) color.add(new THREE.Color(COLORS.selection.emissive));
                         try { atomInstancedMesh.setColorAt(idx, color); } catch(e){}
                     }

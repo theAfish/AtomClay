@@ -18,7 +18,8 @@ const Viewer = () => {
     const {
         atoms, lattice, setLattice, setAtoms, layers, activeLayerId,
         selectedAtomIds, onAtomClick, onAtomsMoveEnd, onBoxSelect,
-        transformMode, editMode, currentRenderer, isChatOpen, moveAtomsWithLattice
+        transformMode, editMode, currentRenderer, isChatOpen, moveAtomsWithLattice,
+        renderSettings
     } = useMolecularContext();
     const { theme } = useTheme();
 
@@ -41,11 +42,11 @@ const Viewer = () => {
         isBoxSelecting: false,
     });
 
-    const latestProps = useRef({ atoms, activeLayerId, theme });
+    const latestProps = useRef({ atoms, activeLayerId, theme, renderSettings });
     useEffect(() => {
-        latestProps.current = { atoms, activeLayerId, theme };
+        latestProps.current = { atoms, activeLayerId, theme, renderSettings };
         if (rendererRef.current) rendererRef.current._latestProps = latestProps.current;
-    }, [atoms, activeLayerId, theme]);
+    }, [atoms, activeLayerId, theme, renderSettings]);
 
     const visibleAtoms = useMemo(() => {
         try {
@@ -68,7 +69,7 @@ const Viewer = () => {
 
     // Initialize renderer (three-based) and wire up callbacks (re-init when `currentRenderer` changes)
     useEffect(() => {
-        const cleanup = initializeRenderer(containerRef, currentRenderer, onAtomClick, onAtomsMoveEnd, onBoxSelect, theme, lattice, drawGizmoRef, latestProps, atoms, layers, activeLayerId, rendererRef, threeRef, transformMode, editMode);
+        const cleanup = initializeRenderer(containerRef, currentRenderer, onAtomClick, onAtomsMoveEnd, onBoxSelect, theme, lattice, renderSettings, drawGizmoRef, latestProps, atoms, layers, activeLayerId, rendererRef, threeRef, transformMode, editMode);
         setRendererVersion(v => v + 1);
         return cleanup;
     }, [currentRenderer]); // Re-init when renderer changes
@@ -132,8 +133,8 @@ const Viewer = () => {
 
     // Sync scene via renderer API (use renderer-specific logic instead of manual creation)
     useEffect(() => {
-        syncRendererScene(rendererRef, atoms, lattice, layers, activeLayerId, theme);
-    }, [atoms, lattice, layers, theme, currentRenderer]);
+        syncRendererScene(rendererRef, atoms, lattice, layers, activeLayerId, theme, renderSettings);
+    }, [atoms, lattice, layers, theme, currentRenderer, renderSettings]);
 
     // Update Selection Visuals — delegate to renderer API if available
     useEffect(() => {

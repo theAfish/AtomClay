@@ -32,6 +32,7 @@ export const useRenderer = (containerRef, currentRenderer, onAtomClick, onAtomsM
         let atomStyle;
         if (currentRenderer === 'custom-toon' || currentRenderer === 'custom-cartoon') atomStyle = 'toon';
         else if (currentRenderer === 'custom-plastic') atomStyle = 'plastic';
+        else if (currentRenderer === 'custom-glossy') atomStyle = 'glossy';
         else if (currentRenderer === 'custom') atomStyle = 'plastic'; // legacy
 
         const rendererApi = currentRenderer && currentRenderer.startsWith('custom') ? createCustomRenderer() : createThreeRenderer();

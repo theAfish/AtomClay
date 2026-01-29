@@ -5,6 +5,7 @@ import { MathUtils } from '../utils/math';
 import { parse } from '../utils/parsers';
 import { createAtomHandlers } from './atomHandlers';
 import { fileStorageService } from '../services/fileStorageService';
+import { DEFAULTS } from '../constants/defaults';
 
 const MolecularContext = createContext(null);
 
@@ -18,6 +19,13 @@ export const useMolecularContext = () => {
 
 export const MolecularProvider = ({ children }) => {
     const { i18n } = useTranslation();
+
+    const DEFAULT_RENDER_SETTINGS = {
+        atomScale: DEFAULTS.VISUALS.ATOM_SCALE,
+        vdwScale: 1,
+        atomColorMode: 'element', // 'element' | 'single'
+        atomColor: '#8aa0ff'
+    };
     
     // Molecular State from Hook
     const molecularState = useMolecularState();
@@ -62,6 +70,12 @@ export const MolecularProvider = ({ children }) => {
     const [showRendererDropdown, setShowRendererDropdown] = useState(false);
     // Chat panel
     const [isChatOpen, setIsChatOpen] = useState(false);
+
+    // Render settings (temporary overrides)
+    const [renderSettings, setRenderSettings] = useState(DEFAULT_RENDER_SETTINGS);
+    const resetRenderSettings = useCallback(() => {
+        setRenderSettings(DEFAULT_RENDER_SETTINGS);
+    }, []);
 
     // Whether lattice edits also move atoms (keep fractional coordinates)
     const [moveAtomsWithLattice, setMoveAtomsWithLattice] = useState(true);
@@ -366,7 +380,8 @@ export const MolecularProvider = ({ children }) => {
     const renderers = [
         { id: 'three', label: 'Three.js' },
         { id: 'custom-cartoon', label: 'Cartoon' },
-        { id: 'custom-plastic', label: 'Plastic' }
+        { id: 'custom-plastic', label: 'Plastic' },
+        { id: 'custom-glossy', label: 'Glossy' }
     ];
 
     const changeRenderer = (id) => {
@@ -551,6 +566,7 @@ export const MolecularProvider = ({ children }) => {
         showLangDropdown, setShowLangDropdown,
         isChatOpen, setIsChatOpen,
         moveAtomsWithLattice, setMoveAtomsWithLattice,
+        renderSettings, setRenderSettings, resetRenderSettings,
         
         // Handlers
         handleLoad,

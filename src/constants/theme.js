@@ -1,7 +1,7 @@
 export const COLORS = {
     background: {
         // a richer, elegant navy/ink for dark mode and light for bright mode
-        dark: '#0b1220', // deep navy-black
+        dark: '#000000', // deep navy-black
         light: '#f1f5f9', // slate-100
     },
     text: {
