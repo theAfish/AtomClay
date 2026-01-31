@@ -107,3 +107,29 @@ export function calculateScaleLattice(atoms, lattice, scaleX = 1, scaleY = 1, sc
 
     return { newAtoms, newLattice };
 }
+
+/**
+ * Wraps atoms into the unit cell.
+ * @param {Array} atoms - List of atoms.
+ * @param {Array} lattice - 3x3 matrix.
+ * @returns {Array} newAtoms
+ */
+export function calculateWrapAtoms(atoms, lattice) {
+    if (!lattice) return atoms;
+    const invLattice = MathUtils.inv3x3(lattice);
+    if (!invLattice) return atoms;
+
+    const invLatticeT = MathUtils.transpose3x3(invLattice);
+    const latticeT = MathUtils.transpose3x3(lattice);
+
+    return atoms.map(atom => {
+        const frac = MathUtils.multiplyMatrixVector(invLatticeT, [atom.x, atom.y, atom.z]);
+        const wrappedFrac = frac.map(c => {
+            const r = c % 1;
+            return r < 0 ? r + 1 : r;
+        });
+        const [nx, ny, nz] = MathUtils.multiplyMatrixVector(latticeT, wrappedFrac);
+        return { ...atom, x: nx, y: ny, z: nz };
+    });
+}
+

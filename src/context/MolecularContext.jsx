@@ -37,6 +37,7 @@ export const MolecularProvider = ({ children }) => {
         handleVacuum: handleVacuumOp,
         handleScaleLattice: handleScaleLatticeOp,
         handleSetLattice: handleSetLatticeOp,
+        handleWrapAtoms: handleWrapAtomsOp,
         addAtoms,
         updateAtoms,
         renameLayer,
@@ -94,6 +95,14 @@ export const MolecularProvider = ({ children }) => {
     const handleSetLattice = (newLat) => {
         try {
             handleSetLatticeOp(newLat);
+        } catch (e) {
+            alert(e.message);
+        }
+    };
+
+    const handleWrapAtoms = () => {
+        try {
+            handleWrapAtomsOp();
         } catch (e) {
             alert(e.message);
         }
@@ -374,6 +383,7 @@ export const MolecularProvider = ({ children }) => {
         handleVacuum,
         handleScaleLattice,
         handleSetLattice,
+        handleWrapAtoms,
         createAtomAtCenter,
         onAtomClick,
         onBoxSelect,

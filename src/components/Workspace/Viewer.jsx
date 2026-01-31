@@ -7,7 +7,7 @@ import ViewerControls from './Viewer/ViewerControls';
 const Viewer = () => {
     return (
         <ViewerProvider>
-            <div className="w-full h-full relative">
+            <div className="w-full h-full relative overflow-hidden">
                 <ViewerCanvas />
                 <ViewerScene />
                 <ViewerControls />

@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { DEFAULTS } from '../constants/defaults';
-import { handleSupercell as doSupercell, handleVacuum as doVacuum, handleScaleLattice as doScaleLattice, handleSetLattice as doSetLattice } from '../logic/latticeHandlers';
+import { handleSupercell as doSupercell, handleVacuum as doVacuum, handleScaleLattice as doScaleLattice, handleSetLattice as doSetLattice, handleWrapAtoms as doWrapAtoms } from '../logic/latticeHandlers';
 import { createOperationRecorder } from '../utils/operationRecorder';
 import { logOperation as sendOperationEntry } from '../services/loggerService';
 
@@ -146,6 +146,11 @@ export function useMolecularState() {
         doSetLattice(atoms, lattice, layers, activeLayerId, saveStateToHistory, currentLatticeSourceId, setLayers, setCurrentLattice, newLattice);
     }, [atoms, lattice, layers, activeLayerId, saveStateToHistory, currentLatticeSourceId, setLayers, setCurrentLattice, recordOperation]);
 
+    const handleWrapAtoms = useCallback(() => {
+        recordOperation('WRAP_ATOMS', {}, { lattice });
+        doWrapAtoms(atoms, lattice, layers, activeLayerId, saveStateToHistory, currentLatticeSourceId, setAtoms);
+    }, [atoms, lattice, layers, activeLayerId, saveStateToHistory, currentLatticeSourceId, setAtoms, recordOperation]);
+
     const addAtoms = useCallback((newAtoms, newLat, createNewLayer = false) => {
         let targetLayerId = activeLayerId;
         const isFirstImport = atoms.length === 0;
@@ -230,6 +235,7 @@ export function useMolecularState() {
         handleVacuum,
         handleScaleLattice,
         handleSetLattice,
+        handleWrapAtoms,
         addAtoms,
         updateAtoms,
         renameLayer,

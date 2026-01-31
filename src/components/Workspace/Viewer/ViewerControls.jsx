@@ -48,7 +48,19 @@ const ViewerControls = () => {
         updateControlAttachment({ threeRef, selectedAtomIds, editMode, atoms });
     }, [selectedAtomIds, atoms, editMode, threeRef]);
 
-    return null; // Logic only
+    if (!selectionBox) return null;
+
+    return (
+        <div
+            className="absolute border-2 border-blue-500 bg-blue-500/20 pointer-events-none z-50"
+            style={{
+                left: selectionBox.left,
+                top: selectionBox.top,
+                width: selectionBox.width,
+                height: selectionBox.height
+            }}
+        />
+    );
 };
 
 export default ViewerControls;

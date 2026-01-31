@@ -25,7 +25,7 @@ const Panels = () => {
         atoms, lattice, 
         handleLoad, handleDownload, 
         handleSupercell, handleVacuum,
-        handleScaleLattice, handleSetLattice,
+        handleScaleLattice, handleSetLattice, handleWrapAtoms,
         layers, setLayers, activeLayerId, setActiveLayerId, setLattice,
         renameLayer,
         selectedAtomIds, setSelectedAtomIds,
@@ -340,6 +340,11 @@ const Panels = () => {
                                     <input type="checkbox" checked={moveAtomsWithLattice} onChange={() => setMoveAtomsWithLattice(!moveAtomsWithLattice)} />
                                     <span className="ml-2">{t('Move atoms with lattice (keep fractional coords)')}</span>
                                 </label>
+                                <div className={`mt-2 border-t ${borderClass} pt-2`}>
+                                    <button onClick={handleWrapAtoms} className={`w-full ${buttonPrimary} py-2 rounded text-xs flex items-center justify-center gap-2`}>
+                                        <Grid size={14} /> {t('Wrap Atoms to Cell')}
+                                    </button>
+                                </div>
                             </div>
                         )}
 

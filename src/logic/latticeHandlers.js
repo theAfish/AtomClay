@@ -1,4 +1,4 @@
-import { calculateSupercell, calculateVacuum, calculateScaleLattice } from '../utils/structureOperations';
+import { calculateSupercell, calculateVacuum, calculateScaleLattice, calculateWrapAtoms } from '../utils/structureOperations';
 
 export function handleSupercell(atoms, lattice, layers, activeLayerId, saveStateToHistory, currentLatticeSourceId, setLayers, setCurrentLattice, setAtoms, mode, diag, matrix) {
     const currentLatticeVal = lattice;
@@ -66,4 +66,18 @@ export function handleSetLattice(atoms, lattice, layers, activeLayerId, saveStat
     saveStateToHistory(atoms, lattice, layers, activeLayerId, currentLatticeSourceId);
     setLayers(prev => prev.map(l => l.id === activeLayerId ? { ...l, lattice: newLattice } : l));
     setCurrentLattice(newLattice);
+}
+
+export function handleWrapAtoms(atoms, lattice, layers, activeLayerId, saveStateToHistory, currentLatticeSourceId, setAtoms) {
+    const currentLatticeVal = lattice;
+    if (!currentLatticeVal) return;
+
+    // Filter atoms for active layer
+    const activeAtoms = atoms.filter(a => a.layerId === activeLayerId);
+    const otherAtoms = atoms.filter(a => a.layerId !== activeLayerId);
+
+    const newActiveAtoms = calculateWrapAtoms(activeAtoms, currentLatticeVal);
+
+    saveStateToHistory(atoms, lattice, layers, activeLayerId, currentLatticeSourceId);
+    setAtoms([...otherAtoms, ...newActiveAtoms]);
 }
