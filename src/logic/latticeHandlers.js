@@ -1,4 +1,4 @@
-import { calculateSupercell, calculateVacuum, calculateScaleLattice } from '../../utils/structureOperations';
+import { calculateSupercell, calculateVacuum, calculateScaleLattice } from '../utils/structureOperations';
 
 export function handleSupercell(atoms, lattice, layers, activeLayerId, saveStateToHistory, currentLatticeSourceId, setLayers, setCurrentLattice, setAtoms, mode, diag, matrix) {
     const currentLatticeVal = lattice;

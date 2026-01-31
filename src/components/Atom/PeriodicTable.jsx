@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ELEMENT_DATA } from '../constants/elements';
+import { ELEMENT_DATA } from '../../constants/elements';
 
 const PERIODIC_TABLE_LAYOUT = [
   ['H',  '',   '',   '',   '',   '',   '',   '',   '',   '',   '',   '',   '',   '',   '',   '',   '',   'He'],

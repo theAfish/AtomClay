@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { ChevronDown, Atom } from 'lucide-react';
-import PeriodicTable from '../PeriodicTable';
+import PeriodicTable from './PeriodicTable';
 import { createPortal } from 'react-dom';
 
 const ElementSelector = ({ value, onChange, panels, className = '' }) => {

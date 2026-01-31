@@ -1,29 +1,32 @@
 import React, { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import Viewer from './components/Viewer';
-import MolstarViewer from './components/MolstarViewer';
-import Panels from './components/Panels';
-import ChatPanel from './components/ChatPanel';
+import Viewer from './components/Workspace/Viewer';
+import MolstarViewer from './components/Workspace/MolstarViewer';
+import Panels from './components/Workspace/Panels';
+import ChatPanel from './components/Workspace/ChatPanel';
 import { MolecularProvider, useMolecularContext } from './context/MolecularContext';
+import { UIProvider, useUIContext } from './context/UIContext';
 import { useTheme } from './context/ThemeContext';
 import { ThemeProvider } from './context/ThemeContext';
-import ErrorBanner from './components/UI/ErrorBanner';
-import ViewModeToggle from './components/UI/ViewModeToggle';
-import FloatingControls from './components/UI/FloatingControls';
-import FooterHelp from './components/UI/FooterHelp';
-import ErrorBoundary from './components/ErrorBoundary';
+import ErrorBanner from './components/Common/ErrorBanner';
+import ViewModeToggle from './components/Workspace/ViewModeToggle';
+import FloatingControls from './components/Workspace/FloatingControls';
+import FooterHelp from './components/Workspace/FooterHelp';
+import ErrorBoundary from './components/Common/ErrorBoundary';
 
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 
 function AppContent() {
     const {
+        handleDragOver,
+        handleDrop
+    } = useMolecularContext();
+    const {
         pdbContent,
         viewMode,
-        handleDragOver,
-        handleDrop,
         isChatOpen,
         setIsChatOpen
-    } = useMolecularContext();
+    } = useUIContext();
     const { theme } = useTheme();
 
     const { t, i18n } = useTranslation();
@@ -62,9 +65,11 @@ function AppContent() {
 function App() {
     return (
         <ThemeProvider>
-            <MolecularProvider>
-                <AppContent />
-            </MolecularProvider>
+            <UIProvider>
+                <MolecularProvider>
+                    <AppContent />
+                </MolecularProvider>
+            </UIProvider>
         </ThemeProvider>
     );
 }

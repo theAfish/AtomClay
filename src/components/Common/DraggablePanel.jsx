@@ -18,11 +18,11 @@ const DraggablePanel = ({
     theme = 'light'
 }) => {
     const [windowSize, setWindowSize] = useState(() => ({ width: window.innerWidth, height: window.innerHeight }));
-    const [position, setPosition] = useState({ 
-        xPercent: (initialX / window.innerWidth) * 100, 
-        yPercent: (initialY / window.innerHeight) * 100 
-    });
+    
+    // Use pixels instead of percentages to avoid drift during resize
+    const [position, setPosition] = useState({ x: initialX, y: initialY });
     const [size, setSize] = useState({ width: initialWidth, height: initialHeight });
+    
     const [isDragging, setIsDragging] = useState(false);
     const [isResizing, setIsResizing] = useState(false);
     const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
@@ -53,88 +53,72 @@ const DraggablePanel = ({
         // Don't interfere while the user is actively interacting
         if (isDragging || isResizing) return;
 
+        let newX = position.x;
+        let newY = position.y;
+        let needsUpdate = false;
+
         // If the parent changed the initial position (e.g., chat opened/closed)
         const initialChanged = initialX !== prevInitialXRef.current || initialY !== prevInitialYRef.current;
 
         if (initialChanged) {
             if (!hasUserMovedRef.current) {
                 // If user never moved the panel, snap to the new initial
-                const clampedX = Math.max(0, Math.min(initialX, windowSize.width - size.width));
-                const clampedY = Math.max(0, Math.min(initialY, windowSize.height - size.height));
-
-                setPosition({
-                    xPercent: (clampedX / windowSize.width) * 100,
-                    yPercent: (clampedY / windowSize.height) * 100
-                });
+                newX = initialX;
+                newY = initialY;
             } else {
-                // If user moved the panel, shift it by the same delta the initial position changed by
+                // If user moved the panel, shift it by the same delta
                 const deltaX = initialX - prevInitialXRef.current;
                 const deltaY = initialY - prevInitialYRef.current;
-
-                const deltaPercentX = (deltaX / windowSize.width) * 100;
-                const deltaPercentY = (deltaY / windowSize.height) * 100;
-
-                const newXPercent = position.xPercent + deltaPercentX;
-                const newYPercent = position.yPercent + deltaPercentY;
-
-                const actualX = (newXPercent / 100) * windowSize.width;
-                const actualY = (newYPercent / 100) * windowSize.height;
-
-                const clampedX = Math.max(0, Math.min(actualX, windowSize.width - size.width));
-                const clampedY = Math.max(0, Math.min(actualY, windowSize.height - size.height));
-
-                setPosition({
-                    xPercent: (clampedX / windowSize.width) * 100,
-                    yPercent: (clampedY / windowSize.height) * 100
-                });
+                newX = newX + deltaX;
+                newY = newY + deltaY;
             }
 
             prevInitialXRef.current = initialX;
             prevInitialYRef.current = initialY;
-            return;
+            needsUpdate = true;
         }
 
-        // Otherwise, keep current relative position but ensure it stays inside the viewport
-        const actualX = (position.xPercent / 100) * windowSize.width;
-        const actualY = (position.yPercent / 100) * windowSize.height;
-        const clampedX = Math.max(0, Math.min(actualX, windowSize.width - size.width));
-        const clampedY = Math.max(0, Math.min(actualY, windowSize.height - size.height));
+        // Clamp
+        const clampedX = Math.max(0, Math.min(newX, windowSize.width - size.width));
+        const clampedY = Math.max(0, Math.min(newY, windowSize.height - size.height));
 
-        if (clampedX !== actualX || clampedY !== actualY) {
-            setPosition({
-                xPercent: (clampedX / windowSize.width) * 100,
-                yPercent: (clampedY / windowSize.height) * 100
-            });
+        if (clampedX !== position.x || clampedY !== position.y) {
+            setPosition({ x: clampedX, y: clampedY });
+        } else if (needsUpdate && (newX !== position.x || newY !== position.y)) {
+             // If we have a delta update that didn't trigger clamp (or triggered clamp to different value than current)
+             // We need this mostly for the case where newX was valid and different from position.x
+             setPosition({ x: clampedX, y: clampedY });
         }
-    }, [initialX, initialY, windowSize.width, windowSize.height, size.width, size.height, isDragging, isResizing, position.xPercent, position.yPercent]);
+    }, [initialX, initialY, windowSize.width, windowSize.height, size.width, size.height, isDragging, isResizing, position.x, position.y]);
 
     useEffect(() => {
         const handlePointerMove = (e) => {
             if (isDragging) {
                 let newX = e.clientX - dragOffset.x;
                 let newY = e.clientY - dragOffset.y;
+                
+                // Clamp during drag
                 newX = Math.max(0, Math.min(newX, windowSize.width - size.width));
                 newY = Math.max(0, Math.min(newY, windowSize.height - size.height));
-                setPosition({
-                    xPercent: (newX / windowSize.width) * 100,
-                    yPercent: (newY / windowSize.height) * 100
-                });
+                
+                setPosition({ x: newX, y: newY });
             } else if (isResizing) {
-                let actualX = (position.xPercent / 100) * windowSize.width;
-                let actualY = (position.yPercent / 100) * windowSize.height;
-                let newWidth = Math.max(minWidth, e.clientX - actualX);
-                let newHeight = Math.max(minHeight, e.clientY - actualY);
-                newWidth = Math.min(newWidth, windowSize.width - actualX);
-                newHeight = Math.min(newHeight, windowSize.height - actualY);
+                // Use current position.x/y directly
+                let newWidth = Math.max(minWidth, e.clientX - position.x);
+                let newHeight = Math.max(minHeight, e.clientY - position.y);
+                
+                // Clamp size
+                newWidth = Math.min(newWidth, windowSize.width - position.x);
+                newHeight = Math.min(newHeight, windowSize.height - position.y);
+                
                 setSize({ width: newWidth, height: newHeight });
             }
         };
 
         const handlePointerUp = (e) => {
-            // If we started dragging and the position changed, mark that the user moved the panel
             if (dragStartRef.current) {
                 const start = dragStartRef.current;
-                if (start.xPercent !== position.xPercent || start.yPercent !== position.yPercent) {
+                if (start.x !== position.x || start.y !== position.y) {
                     hasUserMovedRef.current = true;
                 }
                 dragStartRef.current = null;
@@ -166,16 +150,14 @@ const DraggablePanel = ({
         // Only start drag if clicking on the header (which has the drag-handle class)
         if (e.target.closest('.drag-handle')) {
             e.preventDefault();
-            const actualX = (position.xPercent / 100) * windowSize.width;
-            const actualY = (position.yPercent / 100) * windowSize.height;
-            // Save the start position to detect actual movement on pointerup
-            dragStartRef.current = { xPercent: position.xPercent, yPercent: position.yPercent };
+            // Start drag
+            dragStartRef.current = { x: position.x, y: position.y };
             setIsDragging(true);
             setDragOffset({
-                x: e.clientX - actualX,
-                y: e.clientY - actualY
+                x: e.clientX - position.x,
+                y: e.clientY - position.y
             });
-            // Capture the pointer so we continue getting events even if the pointer leaves the element
+            // Capture pointer
             pointerIdRef.current = e.pointerId;
             if (panelRef.current && typeof panelRef.current.setPointerCapture === 'function') {
                 try { panelRef.current.setPointerCapture(e.pointerId); } catch (err) {}
@@ -187,7 +169,6 @@ const DraggablePanel = ({
         e.stopPropagation();
         e.preventDefault();
         setIsResizing(true);
-        // Capture pointer for resize
         pointerIdRef.current = e.pointerId;
         if (panelRef.current && typeof panelRef.current.setPointerCapture === 'function') {
             try { panelRef.current.setPointerCapture(e.pointerId); } catch (err) {}
@@ -203,8 +184,8 @@ const DraggablePanel = ({
             ref={panelRef}
             className={`fixed shadow-2xl rounded-xl flex flex-col border z-50 ${bgClass} ${className}`}
             style={{
-                left: Math.max(0, Math.min((position.xPercent / 100) * windowSize.width, windowSize.width - size.width)),
-                top: Math.max(0, Math.min((position.yPercent / 100) * windowSize.height, windowSize.height - size.height)),
+                left: position.x,
+                top: position.y,
                 width: size.width,
                 height: size.height,
             }}

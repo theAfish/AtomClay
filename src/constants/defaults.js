@@ -14,6 +14,7 @@ export const DEFAULTS = {
     },
     VISUALS: {
         ATOM_SCALE: 0.4,
+        DEFAULT_ATOM_COLOR: '#8aa0ff',
         SPHERE_SEGMENTS: 32,
         BOND_RADIUS: 0.1,
         BOND_SEGMENTS: 12,
@@ -29,5 +30,13 @@ export const DEFAULTS = {
     },
     HISTORY: {
         MAX_LENGTH: 100,
+    },
+    UI: {
+        RENDERERS: [
+            { id: 'three', label: 'Three.js' },
+            { id: 'custom-cartoon', label: 'Cartoon' },
+            { id: 'custom-plastic', label: 'Plastic' },
+            { id: 'custom-glossy', label: 'Glossy' }
+        ]
     }
 };

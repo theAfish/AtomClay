@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useMolecularContext } from '../../context/MolecularContext';
 import { useTheme } from '../../context/ThemeContext';
 import SettingsPanel from './SettingsPanel';
-import ConfigValidationAlert from './ConfigValidationAlert';
+import ConfigValidationAlert from '../Common/ConfigValidationAlert';
 import RenderSettingsPanel from './RenderSettingsPanel';
 
 const FloatingControls = () => {

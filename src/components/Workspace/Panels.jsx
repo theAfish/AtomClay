@@ -1,23 +1,23 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Box, Layers, Upload, Download, Grid, ChevronDown, Expand, Settings, Scissors, MousePointer2, PlusSquare, Trash2, Move, RotateCw, Maximize2, Check, X, Code } from 'lucide-react';
-import { ELEMENT_DATA } from '../constants/elements';
+import { ELEMENT_DATA } from '../../constants/elements';
 import { useTranslation } from 'react-i18next';
-import { useMolecularContext } from '../context/MolecularContext';
-import { useTheme } from '../context/ThemeContext';
-import usePanelStyles from '../hooks/usePanelStyles';
-import { StructureInfo } from '../utils/structureInfo';
-import LayerNameEditor from './LayerNameEditor';
-import { useLatticeInfo } from '../hooks/useLatticeInfo';
-import SupercellForm from './operations/SupercellForm';
-import VacuumForm from './operations/VacuumForm';
-import ScaleForm from './operations/ScaleForm';
-import SetLatticeForm from './operations/SetLatticeForm';
-import InterfaceForm from './operations/InterfaceForm';
-import ProceduralGenForm from './operations/ProceduralGenForm';
+import { useMolecularContext } from '../../context/MolecularContext';
+import { useTheme } from '../../context/ThemeContext';
+import usePanelStyles from '../../hooks/usePanelStyles';
+import { StructureInfo } from '../../utils/structureInfo';
+import LayerNameEditor from '../Atom/LayerNameEditor';
+import { useLatticeInfo } from '../../hooks/useLatticeInfo';
+import SupercellForm from '../Lattice/SupercellForm';
+import VacuumForm from '../Lattice/VacuumForm';
+import ScaleForm from '../Lattice/ScaleForm';
+import SetLatticeForm from '../Lattice/SetLatticeForm';
+import InterfaceForm from '../Lattice/InterfaceForm';
+import ProceduralGenForm from '../Lattice/ProceduralGenForm';
 import LayersList from './LayersList';
-import DraggablePanel from './UI/DraggablePanel';
-import ElementSelector from './UI/ElementSelector';
-import MoleculeSketcher from './MoleculeSketcher';
+import DraggablePanel from '../Common/DraggablePanel';
+import ElementSelector from '../Atom/ElementSelector';
+import MoleculeSketcher from '../Atom/MoleculeSketcher';
 
 const Panels = () => {
     const { t } = useTranslation();
@@ -65,6 +65,15 @@ const Panels = () => {
 
     const [addSubMode, setAddSubMode] = useState(null);
     const [showSketcher, setShowSketcher] = useState(false);
+
+    // Track window width to update panel positions
+    const [windowWidth, setWindowWidth] = useState(window.innerWidth);
+
+    useEffect(() => {
+        const handleResize = () => setWindowWidth(window.innerWidth);
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
 
     const handleMoleculeSave = (newAtoms) => {
         // Create a proper layer id string (follow app convention)
@@ -132,7 +141,7 @@ const Panels = () => {
     // Calculate panel position based on chat state
     // Chat panel width is typically 320px. Right panel width is 340px. Margin 20px.
     const rightOffset = isChatOpen ? 320 + 360 : 360;
-    const panelX = window.innerWidth - rightOffset;
+    const panelX = windowWidth - rightOffset;
 
     return (
         <>

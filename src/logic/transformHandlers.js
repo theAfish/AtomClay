@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { DEFAULTS } from '../../constants/defaults';
+import { DEFAULTS } from '../constants/defaults';
 
 const toPlain = (v) => ({ x: v.x, y: v.y, z: v.z });
 

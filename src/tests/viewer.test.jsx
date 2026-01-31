@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { MolecularProvider, useMolecularContext } from '../context/MolecularContext';
 import { ThemeProvider } from '../context/ThemeContext';
 import { DEFAULTS } from '../constants/defaults';
-import Viewer from '../components/Viewer';
+import Viewer from '../components/Workspace/Viewer';
 
 // Mock renderers so we can inspect controls.target without creating a real WebGL renderer
 let createdThree = null;

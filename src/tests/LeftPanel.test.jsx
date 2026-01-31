@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest';
 import { render, fireEvent } from '@testing-library/react';
 import { MolecularProvider } from '../context/MolecularContext';
 import { ThemeProvider } from '../context/ThemeContext';
-import Panels from '../components/Panels';
+import Panels from '../components/Workspace/Panels';
 import i18n from '../i18n';
 import { I18nextProvider } from 'react-i18next';
 

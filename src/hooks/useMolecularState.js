@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { DEFAULTS } from '../constants/defaults';
-import { handleSupercell as doSupercell, handleVacuum as doVacuum, handleScaleLattice as doScaleLattice, handleSetLattice as doSetLattice } from '../components/operations/latticeHandlers';
+import { handleSupercell as doSupercell, handleVacuum as doVacuum, handleScaleLattice as doScaleLattice, handleSetLattice as doSetLattice } from '../logic/latticeHandlers';
 import { createOperationRecorder } from '../utils/operationRecorder';
 import { logOperation as sendOperationEntry } from '../services/loggerService';
 

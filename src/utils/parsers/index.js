@@ -45,6 +45,8 @@ export function detectFormat(text = '', filename = '') {
     if (/^\s*\d+\s*$/m.test(sample.split(/\r?\n/)[0] || '')) return 'xyz';
     if (/^\s*(ATOM|HETATM|CRYST1)/im.test(sample)) return 'pdb';
     if (/^data_|^loop_/im.test(sample)) return 'cif';
+
+    const lines = sample.trim().split(/\r?\n/);
     if (lines.length >= 4 && /^\s*\d+\s+\d+/.test(lines[3])) return 'mol';
     
     // POSCAR heuristic: 2nd line is a scale factor (number)

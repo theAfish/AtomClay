@@ -1,11 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { MessageCircle, Send, X, Copy } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { useMolecularContext } from '../context/MolecularContext';
-import { useTheme } from '../context/ThemeContext';
-import { PANEL_CLASSES } from '../constants/theme';
-import { useChatAgent } from '../hooks/useChatAgent';
-import { CHAT_CONSTANTS } from '../constants/chatConstants';
+import { useMolecularContext } from '../../context/MolecularContext';
+import { useTheme } from '../../context/ThemeContext';
+import { PANEL_CLASSES } from '../../constants/theme';
+import { useChatAgent } from '../../hooks/useChatAgent';
+import { CHAT_CONSTANTS } from '../../constants/chatConstants';
 
 // Chat panel for AI assistant interaction
 

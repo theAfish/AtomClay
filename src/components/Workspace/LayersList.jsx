@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Eye, EyeOff, Plus, Trash, CheckSquare, Square, Check, X, Merge } from 'lucide-react';
-import LayerNameEditor from './LayerNameEditor';
+import LayerNameEditor from '../Atom/LayerNameEditor';
 
 const LayersList = ({ layers, panels, activeLayerId, setActiveLayerId, setLattice, setLayers, renameLayer, lattice, saveStateToHistory, atoms, setAtoms, currentLatticeSourceId, handleLayerReviewAction }) => {
     if (!layers) return null;

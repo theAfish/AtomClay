@@ -3,8 +3,8 @@ import { DefaultPluginUISpec } from 'molstar/lib/mol-plugin-ui/spec';
 import { createPluginUI } from 'molstar/lib/mol-plugin-ui/index';
 import { renderReact18 } from 'molstar/lib/mol-plugin-ui/react18';
 import 'molstar/lib/mol-plugin-ui/skin/light.scss';
-import { COLORS } from '../constants/theme';
-import { toPDB } from '../utils/parsers/pdbParser';
+import { COLORS } from '../../constants/theme';
+import { toPDB } from '../../utils/parsers/pdbParser';
 
 export default function MolstarViewer({ pdbContent, structure, visible = true, onClose, theme = 'dark' }) {
     const parentRef = useRef(null);
