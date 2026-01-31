@@ -110,26 +110,7 @@ export function useMolecularState() {
         setTimeout(() => { isUndoingRef.current = false; }, 0);
     }, [atoms, layers, lattice, activeLayerId, currentLatticeSourceId]);
 
-    // Keyboard handler for Ctrl+Z and Ctrl+Y (or Ctrl+Shift+Z)
-    useEffect(() => {
-        const handler = (e) => {
-            if (e.ctrlKey || e.metaKey) {
-                if (e.key === 'z' || e.key === 'Z') {
-                    e.preventDefault();
-                    if (e.shiftKey) {
-                        redo();
-                    } else {
-                        undo();
-                    }
-                } else if (e.key === 'y' || e.key === 'Y') {
-                    e.preventDefault();
-                    redo();
-                }
-            }
-        };
-        window.addEventListener('keydown', handler);
-        return () => window.removeEventListener('keydown', handler);
-    }, [undo, redo]);
+    // Keyboard handler for Ctrl+Z and Ctrl+Y moved to useKeyboardShortcuts.js
 
     const setLattice = useCallback((newLattice, sourceId = null, skipHistory = false) => {
         if (!skipHistory) {

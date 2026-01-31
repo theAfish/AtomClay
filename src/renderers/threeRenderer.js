@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js';
-import { getElementProp, getVdw } from '../constants/elements';
+import { getElementProp, getVdw, normalizeElement } from '../constants/elements';
 import { COLORS } from '../constants/theme';
 import { DEFAULTS } from '../constants/defaults';
 import { MathUtils } from '../utils/math';
@@ -149,16 +149,34 @@ export function createThreeRenderer() {
                 atomScale: Number.isFinite(renderSettings?.atomScale) ? renderSettings.atomScale : DEFAULTS.VISUALS.ATOM_SCALE,
                 vdwScale: Number.isFinite(renderSettings?.vdwScale) ? renderSettings.vdwScale : 1,
                 atomColorMode: renderSettings?.atomColorMode === 'single' ? 'single' : 'element',
-                atomColor: renderSettings?.atomColor || null
+                atomColor: renderSettings?.atomColor || null,
+                elementOverrides: renderSettings?.elementOverrides || {}
             };
             threeRef.renderSettings = settings;
+
+            const getOverriddenProp = (element) => {
+                const normalized = normalizeElement(element);
+                const base = getElementProp(normalized);
+                const override = settings.elementOverrides[normalized];
+                if (override) {
+                    return {
+                        ...base,
+                        radius: override.radius !== undefined ? override.radius : base.radius,
+                        color: override.color !== undefined ? override.color : base.color,
+                        vdw: override.vdw !== undefined ? override.vdw : base.vdw,
+                    };
+                }
+                return base;
+            };
+
             const resolveAtomColor = (element) => {
                 if (settings.atomColorMode === 'single' && settings.atomColor) {
                     try { return new THREE.Color(settings.atomColor); } catch (e) {}
                 }
-                const prop = getElementProp(element);
+                const prop = getOverriddenProp(element);
                 return new THREE.Color(prop.color);
             };
+
             // Update scene background target based on theme
             threeRef.targetBackgroundColor.set(theme === 'dark' ? COLORS.background.dark : COLORS.background.light);
             threeRef.targetLatticeColor.set(theme === 'dark' ? COLORS.lattice.dark : COLORS.lattice.light);
@@ -211,7 +229,7 @@ export function createThreeRenderer() {
                 const instMesh = new THREE.InstancedMesh(sphereGeo, mat, visibleAtoms.length);
                 const dummy = new THREE.Object3D();
                 visibleAtoms.forEach((atom, i) => {
-                    const prop = getElementProp(atom.element);
+                    const prop = getOverriddenProp(atom.element);
                     dummy.position.set(atom.x, atom.y, atom.z);
                     dummy.scale.setScalar(prop.radius * settings.atomScale);
                     dummy.updateMatrix();
@@ -226,7 +244,7 @@ export function createThreeRenderer() {
             } else {
                 const sphereGeo = new THREE.SphereGeometry(1, DEFAULTS.VISUALS.SPHERE_SEGMENTS, DEFAULTS.VISUALS.SPHERE_SEGMENTS);
                 visibleAtoms.forEach(atom => {
-                    const prop = getElementProp(atom.element);
+                    const prop = getOverriddenProp(atom.element);
                     const mat = new THREE.MeshStandardMaterial({ color: resolveAtomColor(atom.element), roughness:0.1, metalness:0.1, emissive: COLORS.general.black });
                     const mesh = new THREE.Mesh(sphereGeo, mat);
                     mesh.position.set(atom.x, atom.y, atom.z);
@@ -257,10 +275,10 @@ export function createThreeRenderer() {
 
                 for (let i=0;i<visibleAtoms.length;i++){
                     const p1=[visibleAtoms[i].x,visibleAtoms[i].y,visibleAtoms[i].z];
-                    const r1 = getVdw(visibleAtoms[i].element) * settings.vdwScale;
+                    const r1 = getOverriddenProp(visibleAtoms[i].element).vdw * settings.vdwScale;
                     for (let j=i;j<visibleAtoms.length;j++){
                         const p2Base=[visibleAtoms[j].x,visibleAtoms[j].y,visibleAtoms[j].z];
-                        const r2 = getVdw(visibleAtoms[j].element) * settings.vdwScale;
+                        const r2 = getOverriddenProp(visibleAtoms[j].element).vdw * settings.vdwScale;
                         // enumerate nearby periodic images (nx,ny,nz in [-1,1]) so multiple periodic-image bonds may be captured
                         const maxOffset = 1;
                         for (let nx=-maxOffset; nx<=maxOffset; nx++){

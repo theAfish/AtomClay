@@ -111,7 +111,7 @@ export const ELEMENT_DATA = {
     "Default": { color: 0xFF00FF, radius: 1.0, vdw: 2.0 },
 };
 
-const normalizeElement = (el) => {
+export const normalizeElement = (el) => {
     if (!el) return "Default";
     if (ELEMENT_DATA[el]) return el;
     

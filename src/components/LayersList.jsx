@@ -1,12 +1,57 @@
 import React, { useState } from 'react';
-import { Eye, EyeOff, Plus, Trash, CheckSquare, Square, Check, X } from 'lucide-react';
+import { Eye, EyeOff, Plus, Trash, CheckSquare, Square, Check, X, Merge } from 'lucide-react';
 import LayerNameEditor from './LayerNameEditor';
 
-const LayersList = ({ layers, panels, activeLayerId, setActiveLayerId, setLattice, setLayers, renameLayer, lattice, saveStateToHistory, atoms, currentLatticeSourceId, handleLayerReviewAction }) => {
+const LayersList = ({ layers, panels, activeLayerId, setActiveLayerId, setLattice, setLayers, renameLayer, lattice, saveStateToHistory, atoms, setAtoms, currentLatticeSourceId, handleLayerReviewAction }) => {
     if (!layers) return null;
 
     const { layerActive, layerInactive, layerButton, layerTextMuted, layerTextDanger, borderClass } = panels;
     const [editingLayerId, setEditingLayerId] = useState(null);
+
+    const handleMergeLayers = () => {
+        const layersToMerge = layers.filter(l => l.selected);
+        if (layersToMerge.length < 2) return;
+
+        if (saveStateToHistory) {
+            saveStateToHistory(atoms, lattice, layers, activeLayerId, currentLatticeSourceId);
+        }
+
+        const id = `layer-${Date.now()}`; // Same ID format as new layer
+        const name = `Merged Layer`;
+        
+        // Find a lattice to use. Prioritize active layer if selected, otherwise first selected.
+        const prioritizedLayer = layersToMerge.find(l => l.id === activeLayerId) || layersToMerge[0];
+        const mergedLattice = prioritizedLayer.lattice ? JSON.parse(JSON.stringify(prioritizedLayer.lattice)) : (lattice ? JSON.parse(JSON.stringify(lattice)) : null);
+
+        const newLayer = { 
+            id, 
+            name, 
+            visible: true, 
+            selected: true, 
+            opacity: 1, 
+            lattice: mergedLattice 
+        };
+
+        // Update atoms
+        const layerIdsToMerge = new Set(layersToMerge.map(l => l.id));
+        const newAtoms = atoms.map(atom => {
+            if (layerIdsToMerge.has(atom.layerId)) {
+                return { ...atom, layerId: id };
+            }
+            return atom;
+        });
+
+        if (setAtoms) setAtoms(newAtoms);
+
+        // Update layers: Remove merged, add new one
+        setLayers(prev => {
+            const remaining = prev.filter(l => !layerIdsToMerge.has(l.id));
+            return [newLayer, ...remaining];
+        });
+
+        setActiveLayerId(id);
+        if (mergedLattice) setLattice(mergedLattice, id);
+    };
 
     return (
         <div className="space-y-2">
@@ -87,17 +132,28 @@ const LayersList = ({ layers, panels, activeLayerId, setActiveLayerId, setLattic
                 </div>
             )})}
 
-            <div className="pt-2">
+            <div className="pt-2 flex gap-2">
                 <button onClick={() => {
                     if (saveStateToHistory) {
                         saveStateToHistory(atoms, lattice, layers, activeLayerId, currentLatticeSourceId);
                     }
                     const id = `layer-${Date.now()}`;
-                    const name = `Layer ${layers.length + 1}`;
+                    const existingNumbers = layers
+                        .map(l => {
+                            const match = l.name.match(/^Layer (\d+)$/);
+                            return match ? parseInt(match[1], 10) : 0;
+                        })
+                        .filter(n => n > 0);
+                    const nextNum = existingNumbers.length > 0 ? Math.max(...existingNumbers) + 1 : layers.length + 1;
+                    const name = `Layer ${nextNum}`;
                     const newLayer = { id, name, visible: true, selected: true, opacity: 1, lattice: lattice ? JSON.parse(JSON.stringify(lattice)) : null };
                     setLayers(prev => [newLayer, ...prev]);
                     setActiveLayerId(id);
-                }} className={`w-full ${panels.buttonPrimary} py-1 rounded text-xs flex items-center justify-center gap-2`}><Plus size={14}/> {`New Layer`}</button>
+                }} className={`flex-1 ${panels.buttonPrimary} py-1 rounded text-xs flex items-center justify-center gap-2`}><Plus size={14}/> {`New Layer`}</button>
+
+                {layers.filter(l => l.selected).length > 1 && (
+                    <button onClick={handleMergeLayers} className={`flex-1 ${panels.buttonPrimary} py-1 rounded text-xs flex items-center justify-center gap-2`} title="Merge selected layers"><Merge size={14}/> {`Merge`}</button>
+                )}
             </div>
         </div>
     );

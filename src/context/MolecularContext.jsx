@@ -551,6 +551,82 @@ export const MolecularProvider = ({ children }) => {
         setSelectedAtomIds([]);
     };
 
+    // Clipboard Logic
+    const [clipboard, setClipboard] = useState(null);
+
+    const copySelection = useCallback(() => {
+        if (selectedAtomIds.length > 0) {
+            const selectedAtoms = atoms.filter(a => selectedAtomIds.includes(a.id));
+            setClipboard({ type: 'atoms', data: selectedAtoms.map(a => ({...a})) }); // Deep copy
+            console.log('Copied atoms:', selectedAtoms.length);
+        } else {
+            const selectedLayers = layers.filter(l => l.selected);
+            if (selectedLayers.length > 0) {
+                const layerIds = selectedLayers.map(l => l.id);
+                const layersCopy = selectedLayers.map(l => ({ ...l }));
+                const associatedAtoms = atoms.filter(a => layerIds.includes(a.layerId)).map(a => ({ ...a }));
+                setClipboard({ type: 'layers', data: layersCopy, atoms: associatedAtoms });
+                console.log('Copied layers:', selectedLayers.length);
+            }
+        }
+    }, [selectedAtomIds, atoms, layers]);
+
+    const pasteSelection = useCallback(() => {
+        if (!clipboard) return;
+
+        if (clipboard.type === 'atoms') {
+            const atomsToPaste = clipboard.data;
+            if (atomsToPaste.length === 0) return;
+
+            // Calculate IDs
+            // Note: We use the functional update pattern's previous state to ensure unique IDs if multiple pastes happen quickly?
+            // Actually, we need to know new IDs to select them. So we rely on 'atoms' from scope.
+            // Risk: if 'atoms' is stale. But for paste triggered by user, it should be fine.
+            const maxId = atoms.length > 0 ? Math.max(...atoms.map(a => a.id)) : -1;
+            
+            const newAtoms = atomsToPaste.map((a, i) => ({
+                ...a,
+                id: maxId + 1 + i,
+                layerId: activeLayerId // Paste into active layer
+            }));
+
+            updateAtoms(prev => [...prev, ...newAtoms], 'paste-atoms');
+            setSelectedAtomIds(newAtoms.map(a => a.id));
+            recordOp('PASTE_ATOMS', { count: atomsToPaste.length, targetLayerId: activeLayerId });
+
+        } else if (clipboard.type === 'layers') {
+            const { data: layersToPaste, atoms: atomsToPaste } = clipboard;
+            
+            const idMap = {}; // oldLayerId -> newLayerId
+            const newLayers = layersToPaste.map((l, i) => {
+                const newId = `layer-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                idMap[l.id] = newId;
+                return {
+                    ...l,
+                    id: newId,
+                    name: `${l.name} (Copy)`,
+                    selected: false,
+                    isAgentInput: false,
+                    isAgentResult: false,
+                    visible: true
+                };
+            });
+
+            // Need to generate new Atom IDs as well
+            const maxId = atoms.length > 0 ? Math.max(...atoms.map(a => a.id)) : -1;
+            
+            const newAtoms = atomsToPaste.map((a, i) => ({
+                ...a,
+                id: maxId + 1 + i,
+                layerId: idMap[a.layerId] // Map to new layer
+            }));
+
+            setLayers(prev => [...prev, ...newLayers]);
+            updateAtoms(prev => [...prev, ...newAtoms], 'paste-layers');
+            recordOp('PASTE_LAYERS', { count: newLayers.length });
+        }
+    }, [clipboard, atoms, activeLayerId, updateAtoms, setLayers, recordOp]);
+
     const value = {
         // Molecular State
         ...molecularState,
@@ -580,6 +656,8 @@ export const MolecularProvider = ({ children }) => {
         onBoxSelect,
         onAtomsMoveEnd,
         deleteSelectedAtoms,
+        copySelection, // Exposed
+        pasteSelection, // Exposed
         handleDragOver,
         handleDrop,
         changeLanguage,

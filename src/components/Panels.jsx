@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Box, Layers, Upload, Download, Grid, ChevronDown, Expand, Settings, Scissors, MousePointer2, PlusSquare, Trash2, Move, RotateCw, Maximize2, Check, X } from 'lucide-react';
+import { Box, Layers, Upload, Download, Grid, ChevronDown, Expand, Settings, Scissors, MousePointer2, PlusSquare, Trash2, Move, RotateCw, Maximize2, Check, X, Code } from 'lucide-react';
 import { ELEMENT_DATA } from '../constants/elements';
 import { useTranslation } from 'react-i18next';
 import { useMolecularContext } from '../context/MolecularContext';
@@ -13,6 +13,7 @@ import VacuumForm from './operations/VacuumForm';
 import ScaleForm from './operations/ScaleForm';
 import SetLatticeForm from './operations/SetLatticeForm';
 import InterfaceForm from './operations/InterfaceForm';
+import ProceduralGenForm from './operations/ProceduralGenForm';
 import LayersList from './LayersList';
 import DraggablePanel from './UI/DraggablePanel';
 import ElementSelector from './UI/ElementSelector';
@@ -31,7 +32,7 @@ const Panels = () => {
         editMode, setEditMode,
         targetElement, setTargetElement,
         transformMode, setTransformMode,
-        updateAtoms,
+        updateAtoms, setAtoms,
         createAtomAtCenter,
         saveStateToHistory, currentLatticeSourceId,
         isChatOpen,
@@ -53,6 +54,7 @@ const Panels = () => {
     const [expand, setExpand] = useState(false);
     const [expandLattice, setExpandLattice] = useState(false);
     const [expandInterface, setExpandInterface] = useState(false);
+    const [expandProcedural, setExpandProcedural] = useState(false);
     const [latticeTab, setLatticeTab] = useState('vacuum');
     
     // Two separate editing states: one for the header (active layer) and one for the layers list
@@ -224,6 +226,17 @@ const Panels = () => {
                                 </button>
                                 {expandInterface && (
                                     <InterfaceForm layers={layers} t={t} panels={panels} />
+                                )}
+                            </div>
+
+                            {/* Procedural Generation */}
+                            <div className={`${panels.bgCard} p-2 rounded border ${borderClass}`}>
+                                <button onClick={() => setExpandProcedural(!expandProcedural)} className={`w-full flex justify-between text-sm ${textSecondary} hover:${textPrimary}`}>
+                                    <span className="flex items-center gap-2"><Code size={16} /> {t('Procedural Generation')}</span>
+                                    <ChevronDown size={14} className={`transition ${expandProcedural?'rotate-180':''}`} />
+                                </button>
+                                {expandProcedural && (
+                                    <ProceduralGenForm t={t} panels={panels} />
                                 )}
                             </div>
                         </div>
@@ -410,6 +423,7 @@ const Panels = () => {
                                 lattice={lattice}
                                 saveStateToHistory={saveStateToHistory}
                                 atoms={atoms}
+                                setAtoms={setAtoms}
                                 currentLatticeSourceId={currentLatticeSourceId}
                                 handleLayerReviewAction={handleLayerReviewAction}
                             />

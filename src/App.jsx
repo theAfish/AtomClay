@@ -13,6 +13,8 @@ import FloatingControls from './components/UI/FloatingControls';
 import FooterHelp from './components/UI/FooterHelp';
 import ErrorBoundary from './components/ErrorBoundary';
 
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
+
 function AppContent() {
     const {
         pdbContent,
@@ -20,32 +22,18 @@ function AppContent() {
         handleDragOver,
         handleDrop,
         isChatOpen,
-        setIsChatOpen,
-        deleteSelectedAtoms
+        setIsChatOpen
     } = useMolecularContext();
     const { theme } = useTheme();
 
     const { t, i18n } = useTranslation();
 
+    // Initialize global keyboard shortcuts (Undo, Redo, Delete, Select All)
+    useKeyboardShortcuts();
+
     useEffect(() => {
         document.title = t('app.title', { defaultValue: 'AtomClay' });
     }, [i18n.language, t]);
-
-    // Global Delete key handler (delete selected atoms) — ignore when typing in inputs
-    useEffect(() => {
-        const onKeyDown = (e) => {
-            const active = document.activeElement;
-            const tag = active ? active.tagName : null;
-            const isTyping = tag === 'INPUT' || tag === 'TEXTAREA' || (active && active.isContentEditable);
-            if (isTyping) return;
-            if (e.key === 'Delete') {
-                e.preventDefault();
-                deleteSelectedAtoms();
-            }
-        };
-        window.addEventListener('keydown', onKeyDown);
-        return () => window.removeEventListener('keydown', onKeyDown);
-    }, [deleteSelectedAtoms]);
 
     return (
         <div className={`relative w-full h-full font-sans select-none flex ${theme === 'dark' ? 'text-white' : 'text-slate-800'}`} onDragOver={handleDragOver} onDrop={handleDrop}>

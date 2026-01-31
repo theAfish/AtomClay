@@ -58,10 +58,10 @@ const FloatingControls = () => {
                 <button
                     className={`px-3 py-1 rounded-full shadow-lg text-sm font-medium flex items-center gap-2 ${theme === 'dark' ? 'bg-slate-800 text-white hover:bg-slate-700' : 'bg-white text-slate-800 hover:bg-slate-100'}`}
                     onClick={() => setIsRenderSettingsOpen(true)}
-                    title="Render Settings"
+                    title="Visual Settings"
                 >
                     <SlidersHorizontal size={16} />
-                    Render
+                    Visuals
                 </button>
                 <div className="relative renderer-dropdown">
                     <button 
