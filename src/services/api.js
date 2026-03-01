@@ -1,30 +1,24 @@
 /**
- * Centralized API service for handling HTTP requests.
+ * Agent API service.
+ * Uses centralized apiClient for HTTP requests.
  */
-
-const API_BASE_URL = ''; // Relative path as per existing code
+import { postStream, getRaw } from './apiClient';
 
 /**
- * Runs the agent with the given payload.
+ * Runs the agent with the given payload (streaming response).
  * @param {Object} payload - The payload to send to the agent.
- * @returns {Promise<Response>} The fetch response.
+ * @returns {Promise<Response>} The raw fetch response for stream reading.
  */
 export const runAgent = async (payload) => {
-    return fetch(`${API_BASE_URL}/run`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
-    });
+    return postStream('/run', payload);
 };
 
 /**
- * Fetches the final structure.
- * @returns {Promise<Response>} The fetch response.
+ * Fetches the final structure (raw response for status checks).
+ * @returns {Promise<Response>} The raw fetch response.
  */
 export const getFinalStructure = async () => {
-    return fetch(`${API_BASE_URL}/get_final_structure`);
+    return getRaw('/get_final_structure');
 };
 
 export const api = {

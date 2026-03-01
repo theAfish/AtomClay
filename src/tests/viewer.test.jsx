@@ -4,6 +4,7 @@ import { describe, test, expect, vi, beforeEach } from 'vitest';
 import * as THREE from 'three';
 import { MolecularProvider, useMolecularContext } from '../context/MolecularContext';
 import { ThemeProvider } from '../context/ThemeContext';
+import { UIProvider } from '../context/UIContext';
 import { DEFAULTS } from '../constants/defaults';
 import Viewer from '../components/Workspace/Viewer';
 
@@ -78,12 +79,14 @@ describe('Viewer center update on renderer switch', () => {
     test('preserves center of scene (centroid) when switching renderers', async () => {
             const { container } = render(
                 <ThemeProvider>
-                    <MolecularProvider>
-                        <>
-                            <Viewer />
-                            <SetAtomsThenSwitch />
-                        </>
-                    </MolecularProvider>
+                    <UIProvider>
+                        <MolecularProvider>
+                            <>
+                                <Viewer />
+                                <SetAtomsThenSwitch />
+                            </>
+                        </MolecularProvider>
+                    </UIProvider>
                 </ThemeProvider>
             );
 

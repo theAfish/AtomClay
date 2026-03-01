@@ -1,11 +1,9 @@
-// Simple client-side logger transport to backend middleware
-// Uses Vite proxy (see vite.config.js) so base URL is relative
+// Simple client-side logger transport to backend middleware.
+// Uses centralized session and apiClient.
+import { getSessionInfo, setSessionInfo } from './sessionService';
 
-let _session = { userId: null, sessionId: null };
-
-export const setSessionInfo = ({ userId, sessionId }) => {
-  _session = { userId: userId || null, sessionId: sessionId || null };
-};
+// Re-export setSessionInfo for backwards compatibility
+export { setSessionInfo };
 
 export const logOperation = async (entryOrType, maybeParams, maybeMetadata) => {
   try {
@@ -14,10 +12,11 @@ export const logOperation = async (entryOrType, maybeParams, maybeMetadata) => {
       entry = { type: entryOrType, params: maybeParams || {}, metadata: maybeMetadata || {} };
     }
 
+    const session = getSessionInfo();
     const payload = {
       entry,
-      userId: _session.userId,
-      sessionId: _session.sessionId
+      userId: session.userId,
+      sessionId: session.sessionId
     };
 
     await fetch('/logs/operation', {
@@ -27,16 +26,16 @@ export const logOperation = async (entryOrType, maybeParams, maybeMetadata) => {
     });
   } catch (e) {
     // Non-fatal; ignore network errors to avoid disrupting UI
-    // console.warn('Failed to send operation log', e);
   }
 };
 
 export const logOperations = async (entries) => {
   try {
+    const session = getSessionInfo();
     const payload = {
       entries,
-      userId: _session.userId,
-      sessionId: _session.sessionId
+      userId: session.userId,
+      sessionId: session.sessionId
     };
     await fetch('/logs/operation', {
       method: 'POST',

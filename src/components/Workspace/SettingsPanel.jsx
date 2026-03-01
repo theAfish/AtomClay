@@ -1,6 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { X, Save, RefreshCw } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
+import usePanelStyles from '../../hooks/usePanelStyles';
 import { configService } from '../../services/configService';
 
 const API_FIELDS = [
@@ -33,12 +34,13 @@ const SettingsPanel = ({ isOpen, onClose }) => {
     const [success, setSuccess] = useState('');
     const [validationWarnings, setValidationWarnings] = useState([]);
 
-    const panelClasses = useMemo(() => ({
-        container: theme === 'dark' ? 'bg-slate-900 text-white border-slate-800' : 'bg-white text-slate-900 border-slate-200',
-        input: theme === 'dark' ? 'bg-slate-800 border-slate-700 text-white placeholder:text-slate-400' : 'bg-white border-slate-200 text-slate-900 placeholder:text-slate-400',
-        muted: theme === 'dark' ? 'text-slate-400' : 'text-slate-500',
-        border: theme === 'dark' ? 'border-slate-800' : 'border-slate-200'
-    }), [theme]);
+    const panels = usePanelStyles(theme);
+    const panelClasses = {
+        container: panels.panelClass,
+        input: `${panels.bgInput} ${panels.borderClass} ${panels.textPrimary}`,
+        muted: panels.textMuted,
+        border: panels.borderClass,
+    };
 
     useEffect(() => {
         if (!isOpen) return;

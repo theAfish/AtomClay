@@ -3,7 +3,7 @@ import { MessageCircle, Send, X, Copy } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useMolecularContext } from '../../context/MolecularContext';
 import { useTheme } from '../../context/ThemeContext';
-import { PANEL_CLASSES } from '../../constants/theme';
+import usePanelStyles from '../../hooks/usePanelStyles';
 import { useChatAgent } from '../../hooks/useChatAgent';
 import { CHAT_CONSTANTS } from '../../constants/chatConstants';
 
@@ -12,19 +12,14 @@ import { CHAT_CONSTANTS } from '../../constants/chatConstants';
 const ChatPanel = ({ isOpen, onToggle }) => {
     const { t } = useTranslation();
     const { theme } = useTheme();
+    const panels = usePanelStyles(theme);
     const { messages, sendMessage, isSending, statusMessage } = useChatAgent();
     const [inputMessage, setInputMessage] = useState('');
     const [isAtBottom, setIsAtBottom] = useState(true);
     const messagesRef = useRef(null);
 
     const isDark = theme === 'dark';
-    const panels = PANEL_CLASSES[theme] || PANEL_CLASSES.dark;
-    const panelClass = panels.panelClass;
-    const textPrimary = panels.textPrimary;
-    const textSecondary = panels.textSecondary;
-    const bgInput = panels.bgInput;
-    const borderClass = panels.borderClass;
-    const buttonPrimary = panels.buttonPrimary;
+    const { panelClass, textPrimary, textSecondary, bgInput, borderClass, buttonPrimary } = panels;
 
     const handleSend = () => {
         if (!inputMessage.trim() || isSending) return;

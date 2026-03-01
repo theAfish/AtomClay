@@ -3,6 +3,7 @@ import { describe, it, expect } from 'vitest';
 import { render, fireEvent } from '@testing-library/react';
 import { MolecularProvider } from '../context/MolecularContext';
 import { ThemeProvider } from '../context/ThemeContext';
+import { UIProvider } from '../context/UIContext';
 import Panels from '../components/Workspace/Panels';
 import i18n from '../i18n';
 import { I18nextProvider } from 'react-i18next';
@@ -14,9 +15,11 @@ describe('Layers panel rename UI (moved to right panel)', () => {
         const { findByTitle, getByText, getAllByText, container } = render(
             <I18nextProvider i18n={i18n}>
                 <ThemeProvider>
-                    <MolecularProvider>
-                        <Panels />
-                    </MolecularProvider>
+                    <UIProvider>
+                        <MolecularProvider>
+                            <Panels />
+                        </MolecularProvider>
+                    </UIProvider>
                 </ThemeProvider>
             </I18nextProvider>
         );

@@ -1,13 +1,10 @@
-// File storage service for importing/exporting files to backend
-// Uses Vite proxy (see vite.config.js) so base URL is relative
+// File storage service for importing/exporting files to backend.
+// Uses centralized session management and apiClient.
+import apiClient from './apiClient';
+import { getSessionInfo, setSessionInfo } from './sessionService';
 
-let _session = { userId: null, sessionId: null };
-
-export const setSessionInfo = ({ userId, sessionId }) => {
-  _session = { userId: userId || null, sessionId: sessionId || null };
-};
-
-export const getSessionInfo = () => _session;
+// Re-export for backwards compatibility
+export { setSessionInfo, getSessionInfo };
 
 /**
  * Import a file to backend storage
@@ -19,25 +16,15 @@ export const getSessionInfo = () => _session;
  */
 export const importFile = async (content, filename, format = null, isExport = false) => {
   try {
-    const response = await fetch('/import', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        content,
-        filename,
-        sessionId: _session.sessionId || 'ui',
-        userId: _session.userId,
-        format,
-        isExport
-      })
+    const session = getSessionInfo();
+    return await apiClient.post('/import', {
+      content,
+      filename,
+      sessionId: session.sessionId || 'ui',
+      userId: session.userId,
+      format,
+      isExport
     });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.detail || 'Failed to import file');
-    }
-
-    return response.json();
   } catch (e) {
     console.warn('Failed to save file to backend:', e);
     throw e;
@@ -51,22 +38,12 @@ export const importFile = async (content, filename, format = null, isExport = fa
  */
 export const exportFile = async (filename) => {
   try {
-    const response = await fetch('/export', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        filename,
-        sessionId: _session.sessionId || 'ui',
-        userId: _session.userId
-      })
+    const session = getSessionInfo();
+    return await apiClient.post('/export', {
+      filename,
+      sessionId: session.sessionId || 'ui',
+      userId: session.userId
     });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.detail || 'Failed to export file');
-    }
-
-    return response.json();
   } catch (e) {
     console.warn('Failed to export file from backend:', e);
     throw e;
@@ -79,14 +56,9 @@ export const exportFile = async (filename) => {
  */
 export const listFiles = async () => {
   try {
-    const sessionId = _session.sessionId || 'ui';
-    const response = await fetch(`/list/${sessionId}`);
-
-    if (!response.ok) {
-      throw new Error('Failed to list files');
-    }
-
-    return response.json();
+    const session = getSessionInfo();
+    const sessionId = session.sessionId || 'ui';
+    return await apiClient.get(`/list/${sessionId}`);
   } catch (e) {
     console.warn('Failed to list files from backend:', e);
     throw e;

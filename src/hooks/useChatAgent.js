@@ -3,8 +3,7 @@ import { useMolecularContext } from '../context/MolecularContext';
 import { buildStructurePayload } from '../utils/structureExports';
 import { CHAT_CONSTANTS } from '../constants/chatConstants';
 import { runAgent, getFinalStructure } from '../services/api';
-import { setSessionInfo as setLoggerSessionInfo } from '../services/loggerService';
-import { setSessionInfo as setFileStorageSessionInfo } from '../services/fileStorageService';
+import { setSessionInfo } from '../services/sessionService';
 
 export const useChatAgent = () => {
     const { atoms, lattice, layers, activeLayerId, loadStructureFromText, handleAgentResult } = useMolecularContext();
@@ -24,8 +23,7 @@ export const useChatAgent = () => {
     const [sessionId] = useState(`s_${Math.random().toString(36).substring(2, 8)}`);
 
     useEffect(() => {
-        setLoggerSessionInfo({ userId, sessionId });
-        setFileStorageSessionInfo({ userId, sessionId });
+        setSessionInfo({ userId, sessionId });
     }, [userId, sessionId]);
 
     const sendMessage = async (text) => {

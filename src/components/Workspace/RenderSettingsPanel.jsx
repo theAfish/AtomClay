@@ -1,21 +1,23 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { X, RefreshCw } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
+import usePanelStyles from '../../hooks/usePanelStyles';
 import { useMolecularContext } from '../../context/MolecularContext';
 import { ELEMENT_DATA } from '../../constants/elements';
 
 const RenderSettingsPanel = ({ isOpen, onClose }) => {
     const { theme } = useTheme();
+    const panels = usePanelStyles(theme);
     const { renderSettings, setRenderSettings, resetRenderSettings } = useMolecularContext();
     const [targetElement, setTargetElement] = useState('C');
 
-    const panelClasses = useMemo(() => ({
-        container: theme === 'dark' ? 'bg-slate-900 text-white border-slate-800' : 'bg-white text-slate-900 border-slate-200',
-        input: theme === 'dark' ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900',
-        muted: theme === 'dark' ? 'text-slate-400' : 'text-slate-500',
-        border: theme === 'dark' ? 'border-slate-800' : 'border-slate-200',
-        button: theme === 'dark' ? 'bg-slate-800 hover:bg-slate-700 text-white' : 'bg-slate-100 hover:bg-slate-200 text-slate-900'
-    }), [theme]);
+    const panelClasses = {
+        container: panels.panelClass,
+        input: `${panels.bgInput} ${panels.borderClass} ${panels.textPrimary}`,
+        muted: panels.textMuted,
+        border: panels.borderClass,
+        button: `${panels.buttonSecondary}`,
+    };
 
     if (!isOpen) return null;
 
