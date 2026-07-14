@@ -384,17 +384,7 @@ void main() {
 `;
 
 export function createBondMaterial({ color = new THREE.Color(0xcccccc), lightDir = new THREE.Vector3(0.5, 0.2, 1.0), ambient = new THREE.Color(0.1, 0.1, 0.1) } = {}) {
-    const mat = new THREE.RawShaderMaterial({
-        vertexShader: bondVertex,
-        fragmentShader: bondFragment,
-        uniforms: {
-            uColor: { value: color },
-            uLightDirection: { value: lightDir.clone().normalize() },
-            uAmbientColor: { value: ambient }
-        },
-        side: THREE.DoubleSide
-    });
-    return mat;
+    return createAtomMaterial({ color, lightDir, ambient });
 }
 
 // Outline shaders for backface outline technique

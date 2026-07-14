@@ -5,7 +5,7 @@ import { getElementProp, getVdw, normalizeElement } from '../constants/elements'
 import { COLORS } from '../constants/theme';
 import { DEFAULTS } from '../constants/defaults';
 import { MathUtils } from '../utils/math';
-import { createAtomMaterial, createBondMaterial, createOutlineMaterial } from './customShaders';
+import { createAtomMaterial, createOutlineMaterial } from './customShaders';
 import { createResizeHandler, createAnimateLoop, setupClickHandlers } from './rendererCommon';
 
 export function createCustomRenderer() {
@@ -214,15 +214,20 @@ export function createCustomRenderer() {
             // Atoms
             const isLargeSystem = visibleAtoms.length > DEFAULTS.PERFORMANCE.INSTANCED_MESH_THRESHOLD;
             threeRef.isInstanced = isLargeSystem;
+            const showOutline = threeRef.atomStyle !== 'glossy';
 
             const atomColorMatCache = new Map();
 
             if (isLargeSystem) {
                 const sphereGeo = new THREE.SphereGeometry(1, DEFAULTS.VISUALS.SPHERE_SEGMENTS, DEFAULTS.VISUALS.SPHERE_SEGMENTS);
-                const outlineInstMesh = new THREE.InstancedMesh(sphereGeo, createOutlineMaterial({ color: threeRef.currentOutlineColor }), visibleAtoms.length);
-                outlineInstMesh.material.defines = { USE_INSTANCING: 1 };
-                outlineInstMesh.material.needsUpdate = true;
-                threeRef.outlineMaterials.push(outlineInstMesh.material);
+                const outlineInstMesh = showOutline
+                    ? new THREE.InstancedMesh(sphereGeo, createOutlineMaterial({ color: threeRef.currentOutlineColor }), visibleAtoms.length)
+                    : null;
+                if (outlineInstMesh) {
+                    outlineInstMesh.material.defines = { USE_INSTANCING: 1 };
+                    outlineInstMesh.material.needsUpdate = true;
+                    threeRef.outlineMaterials.push(outlineInstMesh.material);
+                }
 
                 const instMesh = new THREE.InstancedMesh(sphereGeo, createAtomMaterial({ style: threeRef.atomStyle }), visibleAtoms.length);
                 // Tell material to support instancing via define
@@ -242,13 +247,16 @@ export function createCustomRenderer() {
                     threeRef.instanceIdToAtomId[i] = atom.id;
                     threeRef.atomIdToInstanceId.set && threeRef.atomIdToInstanceId.set(atom.id, i);
 
-                    // For outline
-                    dummy.scale.setScalar(scale * 1.05);
-                    dummy.updateMatrix();
-                    outlineInstMesh.setMatrixAt(i, dummy.matrix);
+                    if (outlineInstMesh) {
+                        dummy.scale.setScalar(scale * 1.05);
+                        dummy.updateMatrix();
+                        outlineInstMesh.setMatrixAt(i, dummy.matrix);
+                    }
                 });
-                outlineInstMesh.userData = { type: 'atom-outline' };
-                scene.add(outlineInstMesh);
+                if (outlineInstMesh) {
+                    outlineInstMesh.userData = { type: 'atom-outline' };
+                    scene.add(outlineInstMesh);
+                }
                 instMesh.userData = { type: 'atom-instanced' };
                 scene.add(instMesh);
                 threeRef.atomInstancedMesh = instMesh;
@@ -257,13 +265,15 @@ export function createCustomRenderer() {
                 visibleAtoms.forEach(atom => {
                     const prop = getOverriddenProp(atom.element);
                     const scale = prop.radius * settings.atomScale;
-                    const outlineMat = createOutlineMaterial({ color: threeRef.currentOutlineColor });
-                    const outlineMesh = new THREE.Mesh(sphereGeo, outlineMat);
-                    outlineMesh.position.set(atom.x, atom.y, atom.z);
-                    outlineMesh.scale.setScalar(scale * 1.05);
-                    outlineMesh.userData = { type: 'atom-outline' };
-                    scene.add(outlineMesh);
-                    threeRef.outlineMaterials.push(outlineMat);
+                    if (showOutline) {
+                        const outlineMat = createOutlineMaterial({ color: threeRef.currentOutlineColor });
+                        const outlineMesh = new THREE.Mesh(sphereGeo, outlineMat);
+                        outlineMesh.position.set(atom.x, atom.y, atom.z);
+                        outlineMesh.scale.setScalar(scale * 1.05);
+                        outlineMesh.userData = { type: 'atom-outline' };
+                        scene.add(outlineMesh);
+                        threeRef.outlineMaterials.push(outlineMat);
+                    }
 
                     const mat = createAtomMaterial({ color: resolveAtomColor(atom.element), style: threeRef.atomStyle });
                     const mesh = new THREE.Mesh(sphereGeo, mat);
@@ -280,7 +290,7 @@ export function createCustomRenderer() {
                 const bondGeo = new THREE.CylinderGeometry(DEFAULTS.VISUALS.BOND_RADIUS, DEFAULTS.VISUALS.BOND_RADIUS, 1, DEFAULTS.VISUALS.BOND_SEGMENTS);
                 // Align geometry to Z axis
                 bondGeo.rotateX(Math.PI/2);
-                const bondMat = createBondMaterial({ color: new THREE.Color(0x999999) });
+                const bondMat = createAtomMaterial({ color: new THREE.Color(0x999999), style: threeRef.atomStyle });
                 // Enable instancing defines so the shader uses `instanceMatrix` and `instanceColor`
                 bondMat.defines = Object.assign({}, bondMat.defines, { USE_INSTANCING: 1 });
                 bondMat.needsUpdate = true;
@@ -358,25 +368,26 @@ export function createCustomRenderer() {
                 if (instMesh.instanceColor) instMesh.instanceColor.needsUpdate = true;
                 if (instMesh.instanceMatrix) instMesh.instanceMatrix.needsUpdate = true;
 
-                // Outline for bonds
-                const outlineBondMat = createOutlineMaterial({ color: threeRef.currentOutlineColor });
-                outlineBondMat.defines = { USE_INSTANCING: 1 };
-                outlineBondMat.needsUpdate = true;
-                threeRef.outlineMaterials.push(outlineBondMat);
-                const outlineInstMesh = new THREE.InstancedMesh(bondGeo, outlineBondMat, bondSegments.length);
-                bondSegments.forEach((seg, idx) => {
-                    const v = new THREE.Vector3().subVectors(seg.end, seg.start);
-                    const len = v.length();
-                    const mid = new THREE.Vector3().addVectors(seg.start, seg.end).multiplyScalar(0.5);
-                    const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,0,1), v.clone().normalize());
-                    dummy.position.copy(mid);
-                    dummy.quaternion.copy(quat);
-                    dummy.scale.set(1.05, 1.05, len);
-                    dummy.updateMatrix();
-                    outlineInstMesh.setMatrixAt(idx, dummy.matrix);
-                });
-                outlineInstMesh.userData.type = 'bond-outline';
-                scene.add(outlineInstMesh);
+                if (showOutline) {
+                    const outlineBondMat = createOutlineMaterial({ color: threeRef.currentOutlineColor });
+                    outlineBondMat.defines = { USE_INSTANCING: 1 };
+                    outlineBondMat.needsUpdate = true;
+                    threeRef.outlineMaterials.push(outlineBondMat);
+                    const outlineInstMesh = new THREE.InstancedMesh(bondGeo, outlineBondMat, bondSegments.length);
+                    bondSegments.forEach((seg, idx) => {
+                        const v = new THREE.Vector3().subVectors(seg.end, seg.start);
+                        const len = v.length();
+                        const mid = new THREE.Vector3().addVectors(seg.start, seg.end).multiplyScalar(0.5);
+                        const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,0,1), v.clone().normalize());
+                        dummy.position.copy(mid);
+                        dummy.quaternion.copy(quat);
+                        dummy.scale.set(1.05, 1.05, len);
+                        dummy.updateMatrix();
+                        outlineInstMesh.setMatrixAt(idx, dummy.matrix);
+                    });
+                    outlineInstMesh.userData.type = 'bond-outline';
+                    scene.add(outlineInstMesh);
+                }
 
                 instMesh.userData.type = 'bond';
                 scene.add(instMesh);
