@@ -2,7 +2,6 @@ import React, { createContext, useContext, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next';
 import { useMolecularState } from '../hooks/useMolecularState';
 import { useFileImportExport } from '../hooks/useFileImportExport';
-import { useAgentReview } from '../hooks/useAgentReview';
 import { useClipboard } from '../hooks/useClipboard';
 import { useUIContext } from './UIContext';
 import { createAtomHandlers } from './atomHandlers';
@@ -48,7 +47,6 @@ export const MolecularProvider = ({ children }) => {
         exportOperationLog
     } = molecularState;
 
-    // Helper to also ship logs to middleware
     const recordOp = useCallback((type, params, metadata) => recordOperation(type, params, metadata), [recordOperation]);
 
     // 2. UI State
@@ -156,18 +154,6 @@ export const MolecularProvider = ({ children }) => {
     // Constant for local use if UIContext doesn't provide the list (it doesn't, usually defined in UI component, but here we expose it)
     const RENDERERS = DEFAULTS.UI.RENDERERS;
 
-    // Agent Review State (extracted hook)
-    const agentReview = useAgentReview({
-        layers, setLayers,
-        atoms, lattice,
-        activeLayerId, setActiveLayerId,
-        setLattice,
-        addAtoms,
-        setSelectedAtomIds,
-        setFileError,
-        recordOp,
-    });
-
     // Initial Load
     useEffect(() => {
         setAtoms([]);
@@ -189,7 +175,6 @@ export const MolecularProvider = ({ children }) => {
         ...molecularState,
         ...uiContext,
         ...fileImportExport,
-        ...agentReview,
         ...clipboardOps,
         
         // Wrapped Handlers

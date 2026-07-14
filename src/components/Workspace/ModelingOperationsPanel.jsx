@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Settings, Grid, Expand, Layers, Code } from 'lucide-react';
+import { Settings, Grid, Expand, Code } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useMolecularContext } from '../../context/MolecularContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -10,7 +10,6 @@ import SupercellForm from '../Lattice/SupercellForm';
 import VacuumForm from '../Lattice/VacuumForm';
 import ScaleForm from '../Lattice/ScaleForm';
 import SetLatticeForm from '../Lattice/SetLatticeForm';
-import InterfaceForm from '../Lattice/InterfaceForm';
 import ProceduralGenForm from '../Lattice/ProceduralGenForm';
 
 /**
@@ -21,7 +20,7 @@ const ModelingOperationsPanel = () => {
     const { t } = useTranslation();
     const { theme } = useTheme();
     const {
-        lattice, layers,
+        lattice,
         handleSupercell, handleVacuum,
         handleScaleLattice, handleSetLattice,
     } = useMolecularContext();
@@ -74,16 +73,6 @@ const ModelingOperationsPanel = () => {
                             {latticeTab === 'scale' && <ScaleForm handleScaleLattice={handleScaleLattice} t={t} panels={panels} />}
                             {latticeTab === 'setlength' && <SetLatticeForm handleSetLattice={handleSetLattice} lattice={lattice} t={t} panels={panels} />}
                         </div>
-                    </Accordion>
-
-                    {/* Interface Building */}
-                    <Accordion
-                        icon={<Layers size={16} />}
-                        title={t('Interface Building')}
-                        className={accordionStyle}
-                        headerClass={headerStyle}
-                    >
-                        <InterfaceForm layers={layers} t={t} panels={panels} />
                     </Accordion>
 
                     {/* Procedural Generation */}

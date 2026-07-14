@@ -61,8 +61,6 @@ export function useClipboard({
                     id: newId,
                     name: `${l.name} (Copy)`,
                     selected: false,
-                    isAgentInput: false,
-                    isAgentResult: false,
                     visible: true,
                 };
             });

@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "atomclay"
+version = "0.1.0"
+description = "Python toolkit for atomic structure modeling"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "AtomClay contributors" }]
+dependencies = []
+
+[tool.setuptools.packages.find]
+include = ["atomclay*"]

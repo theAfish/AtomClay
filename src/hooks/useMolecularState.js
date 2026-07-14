@@ -2,7 +2,6 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { DEFAULTS } from '../constants/defaults';
 import { handleSupercell as doSupercell, handleVacuum as doVacuum, handleScaleLattice as doScaleLattice, handleSetLattice as doSetLattice, handleWrapAtoms as doWrapAtoms } from '../logic/latticeHandlers';
 import { createOperationRecorder } from '../utils/operationRecorder';
-import { logOperation as sendOperationEntry } from '../services/loggerService';
 
 export function useMolecularState() {
     // Layers State
@@ -31,8 +30,6 @@ export function useMolecularState() {
             activeLayerId,
             latticeSourceId: currentLatticeSourceId
         });
-        // Best-effort async send to middleware
-        try { if (entry) sendOperationEntry(entry); } catch {}
         return entry;
     }, [activeLayerId, currentLatticeSourceId]);
 

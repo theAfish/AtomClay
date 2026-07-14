@@ -1,5 +1,5 @@
 import React from 'react';
-import { Layers, Check, X } from 'lucide-react';
+import { Layers } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useMolecularContext } from '../../context/MolecularContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -9,7 +9,7 @@ import LayersList from './LayersList';
 
 /**
  * Right draggable panel containing the layer list,
- * agent review accept/deny, and layer management controls.
+ * layer management controls.
  */
 const LayersPanel = ({ panelX }) => {
     const { t } = useTranslation();
@@ -20,7 +20,6 @@ const LayersPanel = ({ panelX }) => {
         setAtoms,
         renameLayer,
         saveStateToHistory, currentLatticeSourceId,
-        agentReviewState, acceptAgentResult, denyAgentResult, handleLayerReviewAction,
     } = useMolecularContext();
     const panels = usePanelStyles(theme);
     const { panelClass, borderClass } = panels;
@@ -39,16 +38,6 @@ const LayersPanel = ({ panelX }) => {
         >
             <div className="flex flex-col gap-6">
                 <div>
-                    {agentReviewState && agentReviewState.status === 'reviewing' && (
-                        <div className="flex gap-1 mb-3">
-                            <button onClick={acceptAgentResult} className="bg-green-600 hover:bg-green-700 text-white p-1 rounded" title="Accept Agent Result">
-                                <Check size={14} />
-                            </button>
-                            <button onClick={denyAgentResult} className="bg-red-600 hover:bg-red-700 text-white p-1 rounded" title="Deny Agent Result">
-                                <X size={14} />
-                            </button>
-                        </div>
-                    )}
                     <div className="space-y-2">
                         <LayersList
                             layers={layers}
@@ -63,7 +52,6 @@ const LayersPanel = ({ panelX }) => {
                             atoms={atoms}
                             setAtoms={setAtoms}
                             currentLatticeSourceId={currentLatticeSourceId}
-                            handleLayerReviewAction={handleLayerReviewAction}
                         />
                     </div>
                 </div>

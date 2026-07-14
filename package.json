@@ -1,11 +1,25 @@
 {
-  "name": "atom-clay",
-  "private": true,
-  "version": "0.0.0",
+  "name": "atomclay",
+  "private": false,
+  "version": "0.1.0",
+  "description": "Browser and Python toolkit for atomic structure modeling",
+  "license": "MIT",
+  "main": "./dist/atomclay.umd.cjs",
+  "module": "./dist/atomclay.js",
+  "exports": {
+    ".": {
+      "import": "./dist/atomclay.js",
+      "require": "./dist/atomclay.umd.cjs"
+    },
+    "./styles.css": "./dist/style.css"
+  },
+  "files": ["dist", "src", "atomclay", "pyproject.toml", "README.md", "LICENSE"],
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:lib": "vite build --config vite.lib.config.js",
+    "prepublishOnly": "npm run build:lib",
     "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
     "test": "vitest",
     "preview": "vite preview"

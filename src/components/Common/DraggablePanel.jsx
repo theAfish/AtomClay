@@ -57,7 +57,6 @@ const DraggablePanel = ({
         let newY = position.y;
         let needsUpdate = false;
 
-        // If the parent changed the initial position (e.g., chat opened/closed)
         const initialChanged = initialX !== prevInitialXRef.current || initialY !== prevInitialYRef.current;
 
         if (initialChanged) {

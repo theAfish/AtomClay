@@ -1,6 +1,5 @@
 import { useState, useCallback } from 'react';
 import { parse } from '../utils/parsers';
-import { fileStorageService } from '../services/fileStorageService';
 
 export const useFileImportExport = (molecularState, uiHandlers) => {
     const { 
@@ -66,21 +65,6 @@ export const useFileImportExport = (molecularState, uiHandlers) => {
             });
             if (setSelectedAtomIds) setSelectedAtomIds(newIds);
             
-            // Save file to backend storage
-            try {
-                const reader = new FileReader();
-                reader.onload = async (e) => {
-                    try {
-                        const content = e.target.result;
-                        await fileStorageService.importFile(content, file.name);
-                    } catch (error) {
-                        console.warn('Failed to save file to backend:', error);
-                    }
-                };
-                reader.readAsText(file);
-            } catch (error) {
-                console.warn('Failed to initiate backend file save:', error);
-            }
         } catch (e) {
             setFileError(e.message);
             throw e; // Re-throw so caller knows it failed if needed
@@ -166,18 +150,6 @@ export const useFileImportExport = (molecularState, uiHandlers) => {
             filename: filename
         }, { lattice });
         
-        // Save export to backend storage (mark as export for timestamp)
-        try {
-            fileStorageService.importFile(s, filename, 'extxyz', true)
-                .then(result => {
-                    console.log('Export saved to backend:', result);
-                })
-                .catch(error => {
-                    console.warn('Failed to save export to backend:', error);
-                });
-        } catch (error) {
-            console.warn('Failed to initiate backend export save:', error);
-        }
     }, [lattice, layers, atoms, recordOperation]);
 
     return {

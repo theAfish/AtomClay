@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next';
 import Viewer from './components/Workspace/Viewer';
 import MolstarViewer from './components/Workspace/MolstarViewer';
 import Panels from './components/Workspace/Panels';
-import ChatPanel from './components/Workspace/ChatPanel';
 import { MolecularProvider, useMolecularContext } from './context/MolecularContext';
 import { UIProvider, useUIContext } from './context/UIContext';
 import { useTheme } from './context/ThemeContext';
@@ -23,9 +22,7 @@ function AppContent() {
     } = useMolecularContext();
     const {
         pdbContent,
-        viewMode,
-        isChatOpen,
-        setIsChatOpen
+        viewMode
     } = useUIContext();
     const { theme } = useTheme();
 
@@ -40,7 +37,7 @@ function AppContent() {
 
     return (
         <div className={`relative w-full h-full font-sans select-none flex ${theme === 'dark' ? 'text-white' : 'text-slate-800'}`} onDragOver={handleDragOver} onDrop={handleDrop}>
-            <div className={`flex-1 relative ${isChatOpen ? 'mr-80' : ''} transition-all duration-300`}>
+            <div className="flex-1 relative transition-all duration-300">
                 <ErrorBanner />
                 <ViewModeToggle />
                 <FloatingControls />
@@ -57,7 +54,6 @@ function AppContent() {
                 
                 <FooterHelp />
             </div>
-            <ChatPanel isOpen={isChatOpen} onToggle={() => setIsChatOpen(!isChatOpen)} />
         </div>
     );
 }

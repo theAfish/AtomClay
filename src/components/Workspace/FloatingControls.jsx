@@ -1,10 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Moon, Sun, ChevronDown, Settings, SlidersHorizontal } from 'lucide-react';
+import { Moon, Sun, ChevronDown, SlidersHorizontal } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useMolecularContext } from '../../context/MolecularContext';
 import { useTheme } from '../../context/ThemeContext';
-import SettingsPanel from './SettingsPanel';
-import ConfigValidationAlert from '../Common/ConfigValidationAlert';
 import RenderSettingsPanel from './RenderSettingsPanel';
 
 const FloatingControls = () => {
@@ -13,12 +11,10 @@ const FloatingControls = () => {
         showLangDropdown, setShowLangDropdown, 
         changeLanguage,
         // renderer
-        currentRenderer, renderers, showRendererDropdown, setShowRendererDropdown, changeRenderer,
-        isChatOpen
+        currentRenderer, renderers, showRendererDropdown, setShowRendererDropdown, changeRenderer
     } = useMolecularContext();
 
     const { theme, setTheme } = useTheme();
-    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [isRenderSettingsOpen, setIsRenderSettingsOpen] = useState(false);
 
     const languages = [
@@ -45,16 +41,7 @@ const FloatingControls = () => {
 
     return (
         <>
-            <ConfigValidationAlert onOpenSettings={() => setIsSettingsOpen(true)} />
-            <div className="fixed bottom-4 z-[60] flex flex-col gap-2" style={{ right: isChatOpen ? '336px' : '16px' }}>
-                <button
-                    className={`px-3 py-1 rounded-full shadow-lg text-sm font-medium flex items-center gap-2 ${theme === 'dark' ? 'bg-slate-800 text-white hover:bg-slate-700' : 'bg-white text-slate-800 hover:bg-slate-100'}`}
-                    onClick={() => setIsSettingsOpen(true)}
-                    title="Open Settings"
-                >
-                    <Settings size={16} />
-                    Settings
-                </button>
+            <div className="fixed bottom-4 right-4 z-[60] flex flex-col gap-2">
                 <button
                     className={`px-3 py-1 rounded-full shadow-lg text-sm font-medium flex items-center gap-2 ${theme === 'dark' ? 'bg-slate-800 text-white hover:bg-slate-700' : 'bg-white text-slate-800 hover:bg-slate-100'}`}
                     onClick={() => setIsRenderSettingsOpen(true)}
@@ -120,7 +107,6 @@ const FloatingControls = () => {
                 </button>
             </div>
 
-            <SettingsPanel isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
             <RenderSettingsPanel isOpen={isRenderSettingsOpen} onClose={() => setIsRenderSettingsOpen(false)} />
         </>
     );

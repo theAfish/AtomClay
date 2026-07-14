@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { Eye, EyeOff, Plus, Trash, CheckSquare, Square, Check, X, Merge } from 'lucide-react';
+import { Eye, EyeOff, Plus, Trash, CheckSquare, Square, Merge } from 'lucide-react';
 import LayerNameEditor from '../Atom/LayerNameEditor';
 
-const LayersList = ({ layers, panels, activeLayerId, setActiveLayerId, setLattice, setLayers, renameLayer, lattice, saveStateToHistory, atoms, setAtoms, currentLatticeSourceId, handleLayerReviewAction }) => {
+const LayersList = ({ layers, panels, activeLayerId, setActiveLayerId, setLattice, setLayers, renameLayer, lattice, saveStateToHistory, atoms, setAtoms, currentLatticeSourceId }) => {
     if (!layers) return null;
 
     const { layerActive, layerInactive, layerButton, layerTextMuted, layerTextDanger, borderClass } = panels;
@@ -57,55 +57,30 @@ const LayersList = ({ layers, panels, activeLayerId, setActiveLayerId, setLattic
         <div className="space-y-2">
             {layers.map(layer => {
                 let rowClass = activeLayerId===layer.id? layerActive : layerInactive;
-                const isReview = layer.isAgentResult || layer.isAgentInput;
-                if (layer.isAgentResult) rowClass = "bg-green-900/40 border border-green-500/50";
-                if (layer.isAgentInput) rowClass = "bg-red-900/40 border border-red-500/50 opacity-60";
 
                 return (
                 <div key={layer.id} className={`flex items-center justify-between p-2 rounded h-10 ${rowClass}`}>
                     <div className="flex-1 min-w-0 flex items-center gap-2">
-                        {!isReview && (
-                            <button onClick={() => setLayers(prev => prev.map(l => l.id===layer.id? {...l, selected: !l.selected}: l))} className={`p-1`} title={layer.selected ? "Deselect for Agent" : "Select for Agent"}>
+                        <button onClick={() => setLayers(prev => prev.map(l => l.id===layer.id? {...l, selected: !l.selected}: l))} className={`p-1`} title={layer.selected ? "Deselect layer" : "Select layer"}>
                                 {layer.selected ? <CheckSquare size={16} /> : <Square size={16} />}
-                            </button>
-                        )}
+                        </button>
 
-                        {!isReview && (
-                            <button onClick={() => setLayers(prev => prev.map(l => l.id===layer.id? {...l, visible: !l.visible}: l))} className={`p-1`}>
+                        <button onClick={() => setLayers(prev => prev.map(l => l.id===layer.id? {...l, visible: !l.visible}: l))} className={`p-1`}>
                                 {layer.visible ? <Eye size={16} /> : <EyeOff size={16} />}
-                            </button>
-                        )}
+                        </button>
 
                         <button onClick={() => setActiveLayerId(layer.id)} className={`flex-1 min-w-0 text-sm text-left truncate ${activeLayerId===layer.id? 'font-semibold' : ''}`}>
                             <LayerNameEditor layer={layer} onRename={renameLayer} inputClass={panels.bgInput} onEditingChange={(isEditing) => setEditingLayerId(prev => isEditing ? layer.id : (prev === layer.id ? null : prev))} />
                         </button>
 
-                        {layer.lattice && editingLayerId !== layer.id && !isReview && (
+                        {layer.lattice && editingLayerId !== layer.id && (
                             <button onClick={() => setLattice(layer.lattice, layer.id)} className={`text-[10px] ml-2 px-2 py-0.5 rounded ${layerButton}`}>
                                 {`Use Lattice`}
                             </button>
                         )}
                     </div>
                     <div className="flex items-center gap-2">
-                        {isReview ? (
-                            <>
-                                <button 
-                                    onClick={() => handleLayerReviewAction(layer.id, layer.isAgentInput ? 'discard' : 'keep')} 
-                                    className="p-1 text-green-500 hover:text-green-400" 
-                                    title={layer.isAgentInput ? "Accept Modification (Delete Original)" : "Accept Result (Keep New)"}
-                                >
-                                    <Check size={16} />
-                                </button>
-                                <button 
-                                    onClick={() => handleLayerReviewAction(layer.id, layer.isAgentInput ? 'keep' : 'discard')} 
-                                    className="p-1 text-red-500 hover:text-red-400" 
-                                    title={layer.isAgentInput ? "Reject Modification (Restore Original)" : "Reject Result (Delete New)"}
-                                >
-                                    <X size={16} />
-                                </button>
-                            </>
-                        ) : (
-                            editingLayerId !== layer.id && (
+                        {editingLayerId !== layer.id && (
                                 <button onClick={() => {
                                 if (!layers || layers.length <= 1) return;
                                 if (saveStateToHistory) {
@@ -126,8 +101,7 @@ const LayersList = ({ layers, panels, activeLayerId, setActiveLayerId, setLattic
                                     return next;
                                 });
                                 }} className={`p-1 ${layerTextMuted} hover:${layerTextDanger}`} title={`Delete Layer`}><Trash size={14}/></button>
-                            )
-                        )}
+                            )}
                     </div>
                 </div>
             )})}

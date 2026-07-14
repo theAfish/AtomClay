@@ -35,7 +35,6 @@ export const UIProvider = ({ children }) => {
     // Toggle States
     const [showLangDropdown, setShowLangDropdown] = useState(false);
     const [showRendererDropdown, setShowRendererDropdown] = useState(false);
-    const [isChatOpen, setIsChatOpen] = useState(false);
     
     // Renderer selection
     const [currentRenderer, setCurrentRenderer] = useState('three'); // 'three' | 'molstar' | 'canvas'
@@ -60,7 +59,6 @@ export const UIProvider = ({ children }) => {
         showLangDropdown, setShowLangDropdown,
         currentRenderer, setCurrentRenderer,
         showRendererDropdown, setShowRendererDropdown,
-        isChatOpen, setIsChatOpen,
         renderSettings, setRenderSettings, resetRenderSettings,
         moveAtomsWithLattice, setMoveAtomsWithLattice
     };
